@@ -12,6 +12,9 @@ declare global {
 const isLocalHost = (hostname: string) =>
   hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
 
+const isLocalUrl = (value?: string) =>
+  Boolean(value && /https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)(:\d+)?/i.test(value));
+
 const getSocketUrl = () => {
   const configured = process.env.NEXT_PUBLIC_SOCKET_URL;
 
@@ -19,9 +22,15 @@ const getSocketUrl = () => {
     return configured || 'http://localhost:5001';
   }
 
-  if (window.__CRICZONE_CONFIG__?.SOCKET_URL) return window.__CRICZONE_CONFIG__.SOCKET_URL;
-  if (configured) return configured;
-  if (isLocalHost(window.location.hostname)) return 'http://localhost:5001';
+  const runtimeUrl = window.__CRICZONE_CONFIG__?.SOCKET_URL;
+  if (isLocalHost(window.location.hostname)) {
+    if (runtimeUrl) return runtimeUrl;
+    if (configured) return configured;
+    return 'http://localhost:5001';
+  }
+
+  if (runtimeUrl && !isLocalUrl(runtimeUrl)) return runtimeUrl;
+  if (configured && !isLocalUrl(configured)) return configured;
   return '';
 };
 

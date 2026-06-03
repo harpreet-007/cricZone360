@@ -12,6 +12,9 @@ const trimSlash = (value: string) => value.replace(/\/+$/, '');
 const isLocalHost = (hostname: string) =>
   hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
 
+const isLocalUrl = (value?: string) =>
+  Boolean(value && /https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)(:\d+)?/i.test(value));
+
 const getApiBaseUrl = () => {
   const configured = process.env.NEXT_PUBLIC_API_URL;
 
@@ -20,12 +23,14 @@ const getApiBaseUrl = () => {
   }
 
   const runtimeUrl = window.__CRICZONE_CONFIG__?.API_URL;
-  if (runtimeUrl) return trimSlash(runtimeUrl);
-  if (configured) return trimSlash(configured);
-
   if (isLocalHost(window.location.hostname)) {
+    if (runtimeUrl) return trimSlash(runtimeUrl);
+    if (configured) return trimSlash(configured);
     return 'http://localhost:5001/api';
   }
+
+  if (runtimeUrl && !isLocalUrl(runtimeUrl)) return trimSlash(runtimeUrl);
+  if (configured && !isLocalUrl(configured)) return trimSlash(configured);
 
   return `${window.location.origin}/api`;
 };
