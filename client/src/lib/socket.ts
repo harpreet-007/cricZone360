@@ -12,9 +12,6 @@ declare global {
 const isLocalHost = (hostname: string) =>
   hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
 
-const isLocalUrl = (value?: string) =>
-  Boolean(value && /https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)(:\d+)?/i.test(value));
-
 const getSocketUrl = () => {
   const configured = process.env.NEXT_PUBLIC_SOCKET_URL;
 
@@ -29,8 +26,7 @@ const getSocketUrl = () => {
     return 'http://localhost:5001';
   }
 
-  if (runtimeUrl && !isLocalUrl(runtimeUrl)) return runtimeUrl;
-  if (configured && !isLocalUrl(configured)) return configured;
+  // Cloudflare Pages Functions cannot host Socket.IO. Production uses API polling/fetches.
   return '';
 };
 
