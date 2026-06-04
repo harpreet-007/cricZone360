@@ -1513,6 +1513,9 @@ const termsFor = (query) => searchable(query)
   .split(/\s+/)
   .filter(Boolean);
 
+const playerTermsFor = (query) => termsFor(query)
+  .filter((term) => !['t20', 't20i', 'odi', 'odis', 'test', 'tests'].includes(term));
+
 const archiveIncludesQuery = (item, query) => {
   const haystack = searchable([
     item.name,
@@ -2475,7 +2478,7 @@ const searchSeries = async (query) => {
 };
 
 const searchPlayers = async (query) => {
-  const terms = termsFor(query);
+  const terms = playerTermsFor(query);
   const localPlayers = demoPlayers.filter((player) =>
     terms.every((term) => searchable(`${player.name} ${player.country} ${player.role || ''}`).includes(term))
   );

@@ -32,10 +32,14 @@ const queryTerms = (query) => searchableText(query)
   .split(/\s+/)
   .filter(Boolean);
 
+const playerQueryTerms = (query) => queryTerms(query)
+  .filter((term) => !['t20', 't20i', 'odi', 'odis', 'test', 'tests'].includes(term));
+
 const matchIncludesQuery = (match, query) => {
   const haystack = searchableText([
     match.name,
     match.series,
+    match.matchType,
     match.tournamentKey,
     match.venue,
     match.status,
@@ -66,6 +70,7 @@ const itemIncludesQuery = (item, query) => {
     item.country,
     item.role,
     item.series,
+    item.matchType,
     item.tournamentKey,
     item.venue,
     item.status,
@@ -82,6 +87,19 @@ const itemIncludesQuery = (item, query) => {
     const candidates = aliasMap[term] || [term];
     return candidates.some((candidate) => haystack.includes(candidate));
   });
+};
+
+const playerIncludesQuery = (player, query) => {
+  const haystack = searchableText([
+    player.name,
+    player.country,
+    player.role,
+    ...(Array.isArray(player.teams) ? player.teams : []),
+  ].join(' '));
+
+  const terms = playerQueryTerms(query);
+  if (terms.length === 0) return false;
+  return terms.every((term) => haystack.includes(term));
 };
 
 const isLikelyPlayerSearch = (query, players) => {
@@ -124,7 +142,7 @@ const globalSearch = asyncHandler(async (req, res) => {
   ]);
 
   const players = Array.isArray(playerResults.data)
-    ? playerResults.data.filter((player) => itemIncludesQuery(player, searchQuery))
+    ? playerResults.data.filter((player) => playerIncludesQuery(player, searchQuery))
     : [];
   const playerSearch = isLikelyPlayerSearch(searchQuery, players);
   const series = playerSearch

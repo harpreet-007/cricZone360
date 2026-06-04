@@ -134,10 +134,12 @@ const titleCaseName = (value) => String(value || '')
   .map((part) => part ? `${part[0].toUpperCase()}${part.slice(1).toLowerCase()}` : part)
   .join(' ');
 
+const formatTerms = new Set(['t20', 't20i', 'odi', 'odis', 'test', 'tests']);
+
 const playerQueryTerms = (query) => normalized(query)
   .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
   .split(/\s+/)
-  .filter(Boolean);
+  .filter((term) => term && !formatTerms.has(term));
 
 const cricsheetPlayerIdFor = (scorecardName, displayName = scorecardName) => {
   const base = `cricsheet-player-${encodeURIComponent(scorecardName)}`;
@@ -170,14 +172,18 @@ const playerMatchesQuery = (scorecardName, query) => {
     const nameParts = name.split(/\s+/);
     const scorecardInitials = nameParts.slice(0, -1).join('');
     const scorecardSurname = nameParts[nameParts.length - 1];
+    const rawInitialParts = String(scorecardName || '').trim().split(/\s+/).slice(0, -1);
+    const isScorecardAbbreviation = rawInitialParts.length > 0 &&
+      rawInitialParts.every((part) => part.length <= 3 && part === part.toUpperCase());
 
     if (
       scorecardSurname === surname &&
       requestedInitials &&
       scorecardInitials &&
-      scorecardInitials.startsWith(requestedInitials)
+      scorecardInitials.startsWith(requestedInitials) &&
+      isScorecardAbbreviation
     ) {
-      return { matches: true, displayName: titleCaseName(query) };
+      return { matches: true, displayName: titleCaseName(terms.join(' ')) };
     }
   }
 
@@ -581,6 +587,7 @@ const localScorecard = (match) => ({
 const matchText = (match) => normalized([
   match?.name,
   match?.series,
+  match?.matchType,
   match?.venue,
   match?.status,
   match?.country,
@@ -616,6 +623,13 @@ const includesQuery = (item, query) => {
   if (!terms.length) return true;
   const haystack = matchText(item);
   return terms.every((term) => aliasCandidates(term).some((candidate) => haystack.includes(candidate)));
+};
+
+const includesPlayerQuery = (item, query) => {
+  const terms = playerQueryTerms(query);
+  if (!terms.length) return true;
+  const haystack = matchText(item);
+  return terms.every((term) => haystack.includes(term));
 };
 
 const tournamentLabelFor = (tournament, query) => {
@@ -1053,7 +1067,7 @@ const searchProviderPlayers = async (env, query) => {
   const players = await providerRequestPages(env, 'players', { search: query });
   return {
     ...players,
-    data: (Array.isArray(players.data) ? players.data : []).filter((player) => includesQuery(player, query)),
+    data: (Array.isArray(players.data) ? players.data : []).filter((player) => includesPlayerQuery(player, query)),
   };
 };
 
