@@ -397,7 +397,62 @@ const uniqueById = (items) => {
   return Array.from(map.values());
 };
 
-const normalized = (value) => String(value || '').toLowerCase();
+const normalized = (value) => String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+const titleCaseName = (value) => String(value || '')
+  .trim()
+  .split(/\s+/)
+  .map((part) => part ? `${part[0].toUpperCase()}${part.slice(1).toLowerCase()}` : part)
+  .join(' ');
+
+const playerQueryTerms = (query) => normalized(query)
+  .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
+  .split(/\s+/)
+  .filter(Boolean);
+
+const playerIdFor = (scorecardName, displayName = scorecardName) => {
+  const base = `cricsheet-player-${encodeURIComponent(scorecardName)}`;
+  return displayName && normalized(displayName) !== normalized(scorecardName)
+    ? `${base}~alias~${encodeURIComponent(displayName)}`
+    : base;
+};
+
+const parsePlayerId = (id) => {
+  const prefix = 'cricsheet-player-';
+  const raw = String(id);
+  if (!raw.startsWith(prefix)) return null;
+  const [scorecardPart, displayPart] = raw.slice(prefix.length).split('~alias~');
+  const scorecardName = decodeURIComponent(scorecardPart || '');
+  const displayName = displayPart ? decodeURIComponent(displayPart) : scorecardName;
+  return { scorecardName, displayName };
+};
+
+const playerMatchesQuery = (scorecardName, query) => {
+  const name = normalized(scorecardName);
+  const terms = playerQueryTerms(query);
+  if (!terms.length) return { matches: true, displayName: scorecardName };
+  if (name.includes(normalized(query)) || terms.every((term) => name.includes(term))) {
+    return { matches: true, displayName: scorecardName };
+  }
+
+  if (terms.length >= 2) {
+    const surname = terms[terms.length - 1];
+    const requestedInitials = terms.slice(0, -1).map((term) => term[0]).join('');
+    const nameParts = name.split(/\s+/);
+    const scorecardInitials = nameParts.slice(0, -1).join('');
+    const scorecardSurname = nameParts[nameParts.length - 1];
+
+    if (
+      scorecardSurname === surname &&
+      requestedInitials &&
+      scorecardInitials &&
+      scorecardInitials.startsWith(requestedInitials)
+    ) {
+      return { matches: true, displayName: titleCaseName(query) };
+    }
+  }
+
+  return { matches: false, displayName: scorecardName };
+};
 
 const datasetKeysForQuery = (query) => {
   const q = normalized(query);
@@ -457,16 +512,17 @@ const searchMatches = async (query, options = {}) => {
 const searchPlayers = async (query) => {
   const keys = datasetKeysForQuery(query);
   const datasets = await loadDatasets(keys);
-  const q = normalized(query);
   const players = new Map();
 
   datasets.forEach((dataset) => {
     dataset.summaries.forEach((match) => {
       (match.playerNames || []).forEach((name) => {
-        if (normalized(name).includes(q) && !players.has(name)) {
+        const matchResult = playerMatchesQuery(name, query);
+        if (matchResult.matches && !players.has(name)) {
           players.set(name, {
-            id: `cricsheet-player-${encodeURIComponent(name)}`,
-            name,
+            id: playerIdFor(name, matchResult.displayName),
+            name: matchResult.displayName,
+            scorecardName: name,
             country: match.series || dataset.label,
           });
         }
@@ -476,7 +532,7 @@ const searchPlayers = async (query) => {
 
   return {
     status: 'success',
-    data: Array.from(players.values()).slice(0, 50),
+    data: Array.from(players.values()),
     info: {
       source: 'cricsheet',
       reason: `Loaded player names from ${datasets.map((dataset) => dataset.label).join(', ')}`,
@@ -563,12 +619,13 @@ const playerMatchStats = (match, playerName) => {
 };
 
 const getPlayerInfo = async (id) => {
-  const prefix = 'cricsheet-player-';
-  if (!String(id).startsWith(prefix)) {
+  const parsedId = parsePlayerId(id);
+  if (!parsedId) {
     return { status: 'failure', data: null, info: { source: 'cricsheet', reason: 'Not a Cricsheet player id' } };
   }
 
-  const playerName = decodeURIComponent(String(id).slice(prefix.length));
+  const playerName = parsedId.scorecardName;
+  const displayName = parsedId.displayName || playerName;
   const datasets = await loadDatasets(['ipl', 'wpl']);
   const battingByFormat = new Map();
   const bowlingByFormat = new Map();
@@ -645,7 +702,8 @@ const getPlayerInfo = async (id) => {
     status: 'success',
     data: {
       id,
-      name: playerName,
+      name: displayName,
+      scorecardName: playerName,
       country: latestSeries || 'Cricsheet player',
       role: 'Player',
       teams: Array.from(teams),

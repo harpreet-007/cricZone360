@@ -1466,6 +1466,33 @@ const withFallback = async (endpoint, params, fallback) => {
   };
 };
 
+const providerRequestPages = async (endpoint, params = {}, { pageSize = 25, maxPages = 12 } = {}) => {
+  const pages = [];
+  let info = {};
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const offset = page * pageSize;
+    const payload = await providerRequest(endpoint, { ...params, offset });
+    info = { ...info, ...(payload.info || {}) };
+
+    if (payload.status === 'failure' || payload.status === 'error') {
+      return { status: 'success', data: pages, info: { ...info, source: 'provider', reason: payload.reason || payload.message || 'Provider returned an error' } };
+    }
+
+    const data = Array.isArray(payload.data) ? payload.data : [];
+    pages.push(...data);
+
+    const totalRows = Number(payload.info?.totalRows || payload.info?.total || payload.totalRows || 0);
+    if (data.length < pageSize || (totalRows && pages.length >= totalRows)) break;
+  }
+
+  return {
+    status: 'success',
+    data: pages,
+    info: { ...info, source: 'provider' },
+  };
+};
+
 const findMatch = (id) => [...demoMatches, ...u19WorldCupMatches, ...iplArchiveMatches, ...tournamentArchiveMatches, ...worldCupFullMatchArchive, ...u19FullMatchArchive, ...ashesFullMatchArchive, ...womenTournamentMatches, ...womenU19FullMatchArchive, ...wplFullSeasonArchive, ...playerSpotlightMatches].find((match) => match.id === id);
 const findPlayer = (id) => demoPlayers.find((player) => player.id === id);
 
@@ -1622,6 +1649,63 @@ const realScorecardUnavailableData = (match, message = 'Real scorecard data is u
   highlights: [
     { title: 'Scorecard', value: message },
   ],
+});
+
+const hasUsableData = (payload) => {
+  const data = payload?.data;
+  if (Array.isArray(data)) return data.length > 0;
+  return Boolean(data && typeof data === 'object');
+};
+
+const scoreSummaryToScorecard = (score = []) => score.map((inning) => ({
+  inning: inning.inning || 'Innings',
+  batting: [],
+  bowling: [],
+  totals: {
+    runs: inning.r ?? 0,
+    wickets: inning.w ?? 0,
+    overs: inning.o ?? '-',
+    extras: 0,
+  },
+}));
+
+const localMatchInfoFallback = (match, reason = 'Loaded local match detail because provider score data is unavailable.') => ({
+  status: 'success',
+  data: {
+    ...match,
+    scheduledTime: match.scheduledTime || match.dateTimeGMT || 'Time unavailable',
+    squads: match.squads || (match.teams || []).map((team) => ({
+      team,
+      players: Array.isArray(match.playerNames) && match.playerNames.length ? match.playerNames : ['Squad details unavailable'],
+    })),
+    highlights: match.highlights || [
+      ...(match.status ? [{ title: 'Status', value: match.status }] : []),
+      ...(match.matchWinner ? [{ title: 'Winner', value: match.matchWinner }] : []),
+    ],
+  },
+  info: {
+    source: 'local-match-fallback',
+    reason,
+  },
+});
+
+const localScorecardFallback = (match, reason = 'Loaded local score summary because provider scorecard data is unavailable.') => ({
+  status: 'success',
+  data: {
+    ...match,
+    scorecard: Array.isArray(match.scorecard) && match.scorecard.length
+      ? match.scorecard
+      : scoreSummaryToScorecard(match.score || []),
+    commentary: match.commentary || [],
+    highlights: match.highlights || [
+      ...(match.status ? [{ title: 'Status', value: match.status }] : []),
+      ...(match.matchWinner ? [{ title: 'Winner', value: match.matchWinner }] : []),
+    ],
+  },
+  info: {
+    source: 'local-scorecard-fallback',
+    reason,
+  },
 });
 
 const generatedArchiveMatchers = [
@@ -1781,7 +1865,19 @@ const getMatches = async () => {
   ]);
 
   if (data.length === 0) {
-    return cricsheetApi.getMatches();
+    const cricsheetMatches = await cricsheetApi.getMatches().catch(() => ({ data: [], info: {} }));
+    return {
+      status: 'success',
+      data: mergeById([
+        ...demoMatches,
+        ...(Array.isArray(cricsheetMatches.data) ? cricsheetMatches.data : []),
+      ]),
+      info: {
+        source: 'local-demo+cricsheet',
+        reason: current.info?.reason || scheduled.info?.reason || 'Provider unavailable; loaded demo live cards and Cricsheet archive matches.',
+        cricsheet: cricsheetMatches.info || {},
+      },
+    };
   }
 
   return {
@@ -2035,7 +2131,8 @@ const getMatchInfo = async (id) => {
   }
 
   const fallback = findMatch(id) || demoMatches[0];
-  return withFallback('match_info', { id }, fallback);
+  const providerMatch = await withFallback('match_info', { id }, fallback);
+  return hasUsableData(providerMatch) ? providerMatch : localMatchInfoFallback(fallback);
 };
 
 const getScorecard = async (id) => {
@@ -2270,10 +2367,14 @@ const getScorecard = async (id) => {
   }
 
   const match = findMatch(id) || demoMatches[0];
-  return withFallback('match_scorecard', { id }, {
+  const fallback = {
     ...match,
-    scorecard: match.score || [],
-  });
+    scorecard: Array.isArray(match.scorecard) && match.scorecard.length
+      ? match.scorecard
+      : scoreSummaryToScorecard(match.score || []),
+  };
+  const providerScorecard = await withFallback('match_scorecard', { id }, fallback);
+  return hasUsableData(providerScorecard) ? providerScorecard : localScorecardFallback(match);
 };
 
 const getSeries = async (offset = 0) => {
@@ -2375,27 +2476,45 @@ const searchSeries = async (query) => {
 
 const searchPlayers = async (query) => {
   const terms = termsFor(query);
-  const fallback = demoPlayers.filter((player) =>
+  const localPlayers = demoPlayers.filter((player) =>
     terms.every((term) => searchable(`${player.name} ${player.country} ${player.role || ''}`).includes(term))
   );
 
-  if (fallback.length) {
-    return {
+  const [providerPlayers, cricsheetPlayers] = await Promise.all([
+    providerRequestPages('players', { search: query }).catch((error) => ({
       status: 'success',
-      data: fallback,
+      data: [],
       info: {
-        source: 'local-players',
-        reason: 'Loaded matching player profile from local player data.',
+        source: 'provider',
+        reason: error.message,
       },
-    };
-  }
+    })),
+    cricsheetApi.searchPlayers(query).catch((error) => ({
+      status: 'success',
+      data: [],
+      info: {
+        source: 'cricsheet',
+        reason: error.message,
+      },
+    })),
+  ]);
 
-  const players = await withFallback('players', { search: query }, fallback);
-  if (!Array.isArray(players.data) || players.data.length === 0) {
-    return cricsheetApi.searchPlayers(query);
-  }
+  const providerMatches = (Array.isArray(providerPlayers.data) ? providerPlayers.data : []).filter((player) =>
+    terms.every((term) => searchable(`${player.name} ${player.country} ${player.role || ''}`).includes(term))
+  );
+  const cricsheetMatches = Array.isArray(cricsheetPlayers.data) ? cricsheetPlayers.data : [];
+  const data = mergeById([...providerMatches, ...cricsheetMatches, ...localPlayers]);
 
-  return players;
+  return {
+    status: 'success',
+    data,
+    info: {
+      source: 'provider+cricsheet+local',
+      provider: providerPlayers.info || {},
+      cricsheet: cricsheetPlayers.info || {},
+      local: localPlayers.length ? { source: 'local-players', reason: 'Loaded matching player profile from local player data.' } : {},
+    },
+  };
 };
 
 const searchMatches = async (query, options = {}) => {

@@ -124,7 +124,7 @@ const globalSearch = asyncHandler(async (req, res) => {
   ]);
 
   const players = Array.isArray(playerResults.data)
-    ? playerResults.data.filter((player) => itemIncludesQuery(player, searchQuery)).slice(0, 12)
+    ? playerResults.data.filter((player) => itemIncludesQuery(player, searchQuery))
     : [];
   const playerSearch = isLikelyPlayerSearch(searchQuery, players);
   const series = playerSearch
