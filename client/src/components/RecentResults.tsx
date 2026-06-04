@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { getMatches } from '@/lib/api';
+import { logClientWarning } from '@/lib/clientError';
 import { asArray, CricketMatch, formatMatchDateTime, scoreForTeam, sortByDateDesc, teamName, teamShort } from '@/lib/cricket';
 import { Zap, ChevronRight, Trophy } from 'lucide-react';
 import Link from 'next/link';
@@ -17,7 +18,7 @@ const RecentResults = () => {
         const ended = sortByDateDesc(asArray<CricketMatch>(data).filter((m) => m.matchEnded)).slice(0, 4);
         setMatches(ended);
       } catch (error) {
-        console.error('Error fetching recent results:', error);
+        logClientWarning('Error fetching recent results', error);
       } finally {
         setLoading(false);
       }

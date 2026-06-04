@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Search, X, Loader2, Trophy, User, MapPin, Calendar, Database } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { searchEverything } from '@/lib/api';
+import { logClientWarning } from '@/lib/clientError';
 
 const GlobalSearch = () => {
   const [query, setQuery] = useState('');
@@ -32,7 +33,7 @@ const GlobalSearch = () => {
           const data = await searchEverything(query);
           setResults(data);
         } catch (error) {
-          console.error('Search error:', error);
+          logClientWarning('Search error', error);
         } finally {
           setIsLoading(false);
         }

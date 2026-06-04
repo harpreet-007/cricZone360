@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { getMatches } from '@/lib/api';
+import { logClientWarning } from '@/lib/clientError';
 import { asArray, CricketMatch, formatMatchDateTime, sortByDateAsc, teamName, teamShort } from '@/lib/cricket';
 import { Calendar, MapPin, Clock, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
@@ -66,7 +67,7 @@ const UpcomingMatches = () => {
         setMatches(upcoming.length ? upcoming : fallbackUpcoming);
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching upcoming matches:', error);
+        logClientWarning('Error fetching upcoming matches', error);
         setMatches(fallbackUpcoming);
         setLoading(false);
       }

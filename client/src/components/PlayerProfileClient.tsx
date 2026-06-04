@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getPlayerInfo } from '@/lib/api';
+import { logClientWarning } from '@/lib/clientError';
 import Navbar from '@/components/Navbar';
 import { Award, BarChart2, CalendarDays, ExternalLink, ImageOff, Newspaper, Shield, TrendingUp, Trophy, Zap } from 'lucide-react';
 
@@ -47,7 +48,7 @@ const PlayerProfile = ({ id }: { id?: string }) => {
         const data = await getPlayerInfo(decodeURIComponent(id as string));
         setPlayer(data);
       } catch (error) {
-        console.error('Error fetching player info:', error);
+        logClientWarning('Error fetching player info', error);
       } finally {
         setLoading(false);
       }

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { getMatchInfo, getScorecard } from '@/lib/api';
+import { logClientWarning } from '@/lib/clientError';
 import { oversForTeam, scoreForTeam, teamName, teamShort } from '@/lib/cricket';
 import Navbar from '@/components/Navbar';
 import { Trophy, MapPin, Calendar, Info, Clock, Users, ChevronDown, ChevronUp, Database, MessageSquareText } from 'lucide-react';
@@ -39,7 +40,7 @@ const MatchDetails = ({ id }: { id?: string }) => {
         setScorecard(isMatchPayload(scorecardData) ? scorecardData : null);
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching match details:', error);
+        logClientWarning('Error fetching match details', error);
         setLoading(false);
       }
     };

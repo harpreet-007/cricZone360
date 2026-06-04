@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { getMatches } from '@/lib/api';
+import { logClientWarning } from '@/lib/clientError';
 import { asArray, CricketMatch, oversForTeam, scoreForTeam, teamName, teamShort } from '@/lib/cricket';
 import socket from '@/lib/socket';
 import { MapPin, Clock, ChevronRight, Radio, MessageSquareText } from 'lucide-react';
@@ -19,7 +20,7 @@ const LiveScores = () => {
         const liveMatches = asArray<CricketMatch>(data).filter((m) => m.matchStarted && !m.matchEnded);
         setMatches(liveMatches);
       } catch (error) {
-        console.error('Error fetching live matches:', error);
+        logClientWarning('Error fetching live matches', error);
         setError('Live cricket feed is unavailable. Check the backend/API key connection.');
       } finally {
         setLoading(false);

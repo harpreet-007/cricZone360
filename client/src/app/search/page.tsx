@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getSearchMetadata, searchEverything } from '@/lib/api';
+import { logClientWarning } from '@/lib/clientError';
 import Navbar from '@/components/Navbar';
 import Link from 'next/link';
 import { AlertTriangle, Trophy, MapPin, ChevronRight, Database, CalendarDays, Filter, Search, Sparkles, User } from 'lucide-react';
@@ -454,7 +455,7 @@ const SearchResultsContent = () => {
         const data = await getSearchMetadata();
         setMetadata(Array.isArray(data) ? data : []);
       } catch (error) {
-        console.error('Search metadata error:', error);
+        logClientWarning('Search metadata error', error);
       }
     };
 
@@ -470,7 +471,7 @@ const SearchResultsContent = () => {
         setResults(data);
         setLoading(false);
       } catch (error) {
-        console.error('Search error:', error);
+        logClientWarning('Search error', error);
         setLoading(false);
       }
     };
