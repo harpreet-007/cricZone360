@@ -6,6 +6,14 @@ import { oversForTeam, scoreForTeam, teamName, teamShort } from '@/lib/cricket';
 import Navbar from '@/components/Navbar';
 import { Trophy, MapPin, Calendar, Info, Clock, Users, ChevronDown, ChevronUp, Database, MessageSquareText } from 'lucide-react';
 
+const isValidMatchId = (value?: string) => {
+  const id = String(value || '').trim();
+  return Boolean(id) && !id.includes('.') && !id.includes('/') && id !== 'index';
+};
+
+const isMatchPayload = (value: any) =>
+  value && !Array.isArray(value) && typeof value === 'object' && Boolean(value.id || value.name || value.teams?.length);
+
 const MatchDetails = ({ id }: { id?: string }) => {
   const [match, setMatch] = useState<any>(null);
   const [scorecard, setScorecard] = useState<any>(null);
@@ -18,13 +26,17 @@ const MatchDetails = ({ id }: { id?: string }) => {
       setLoading(true);
       setMatch(null);
       setScorecard(null);
+      if (!isValidMatchId(id)) {
+        setLoading(false);
+        return;
+      }
       try {
         const [matchData, scorecardData] = await Promise.all([
           getMatchInfo(decodeURIComponent(id as string)),
           getScorecard(decodeURIComponent(id as string))
         ]);
-        setMatch(matchData);
-        setScorecard(scorecardData);
+        setMatch(isMatchPayload(matchData) ? matchData : null);
+        setScorecard(isMatchPayload(scorecardData) ? scorecardData : null);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching match details:', error);

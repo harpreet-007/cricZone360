@@ -1,2 +1,4 @@
+/match/index.txt /match/ 302
+/player/index.txt /player/ 302
 /match/:id /match?id=:id 302
 /player/:id /player?id=:id 302

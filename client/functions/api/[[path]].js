@@ -29,6 +29,95 @@ const CRICSHEET_DATASETS = {
 const cricsheetCaches = new Map();
 const cricsheetPromises = new Map();
 
+const now = Date.now();
+const demoMatches = [
+  {
+    id: 'demo-live-ind-v-aus',
+    name: 'India vs Australia, 2nd T20I',
+    series: 'International T20 Series',
+    matchType: 't20',
+    status: 'India need 42 runs from 30 balls',
+    venue: 'M. Chinnaswamy Stadium, Bengaluru',
+    date: new Date(now).toISOString(),
+    dateTimeGMT: new Date(now).toISOString(),
+    matchStarted: true,
+    matchEnded: false,
+    teams: ['India', 'Australia'],
+    teamInfo: [
+      { name: 'India', shortname: 'IND' },
+      { name: 'Australia', shortname: 'AUS' },
+    ],
+    score: [
+      { inning: 'Australia Inning 1', r: 182, w: 6, o: 20 },
+      { inning: 'India Inning 1', r: 141, w: 4, o: 15 },
+    ],
+    tossWinner: 'India',
+    tossChoice: 'field',
+  },
+  {
+    id: 'demo-live-eng-v-nz',
+    name: 'England Women vs New Zealand Women',
+    series: "Women's ODI Championship",
+    matchType: 'odi',
+    status: 'New Zealand Women are 97/2 after 21 overs',
+    venue: "Lord's, London",
+    date: new Date(now - 1000 * 60 * 35).toISOString(),
+    dateTimeGMT: new Date(now - 1000 * 60 * 35).toISOString(),
+    matchStarted: true,
+    matchEnded: false,
+    teams: ['England Women', 'New Zealand Women'],
+    teamInfo: [
+      { name: 'England Women', shortname: 'ENG-W' },
+      { name: 'New Zealand Women', shortname: 'NZ-W' },
+    ],
+    score: [
+      { inning: 'England Women Inning 1', r: 248, w: 8, o: 50 },
+      { inning: 'New Zealand Women Inning 1', r: 97, w: 2, o: 21 },
+    ],
+  },
+  {
+    id: 'demo-upcoming-ipl-final',
+    name: 'Mumbai Indians vs Chennai Super Kings',
+    series: 'IPL 2026',
+    matchType: 't20',
+    status: 'Match not started',
+    venue: 'Wankhede Stadium, Mumbai',
+    date: new Date(now + 1000 * 60 * 60 * 26).toISOString(),
+    dateTimeGMT: new Date(now + 1000 * 60 * 60 * 26).toISOString(),
+    matchStarted: false,
+    matchEnded: false,
+    teams: ['Mumbai Indians', 'Chennai Super Kings'],
+    teamInfo: [
+      { name: 'Mumbai Indians', shortname: 'MI' },
+      { name: 'Chennai Super Kings', shortname: 'CSK' },
+    ],
+  },
+  {
+    id: 'demo-result-pak-v-sa',
+    name: 'Pakistan vs South Africa, 1st ODI',
+    series: 'ICC Champions Trophy Warm-up',
+    matchType: 'odi',
+    status: 'Pakistan won by 5 wickets',
+    venue: 'Gaddafi Stadium, Lahore',
+    date: new Date(now - 1000 * 60 * 60 * 30).toISOString(),
+    dateTimeGMT: new Date(now - 1000 * 60 * 60 * 30).toISOString(),
+    matchStarted: true,
+    matchEnded: true,
+    teams: ['Pakistan', 'South Africa'],
+    teamInfo: [
+      { name: 'Pakistan', shortname: 'PAK' },
+      { name: 'South Africa', shortname: 'SA' },
+    ],
+    score: [
+      { inning: 'South Africa Inning 1', r: 264, w: 9, o: 50 },
+      { inning: 'Pakistan Inning 1', r: 268, w: 5, o: 48.2 },
+    ],
+    matchWinner: 'Pakistan',
+  },
+];
+
+const findDemoMatch = (id) => demoMatches.find((match) => match.id === id);
+
 const json = (data, init = {}) => new Response(JSON.stringify(data), {
   ...init,
   headers: {
@@ -445,6 +534,49 @@ const uniqueById = (items) => {
   });
   return Array.from(map.values());
 };
+
+const hasUsableData = (payload) => {
+  const data = payload?.data;
+  if (Array.isArray(data)) return data.length > 0;
+  return Boolean(data && typeof data === 'object');
+};
+
+const scoreSummaryToScorecard = (score = []) => score.map((inning) => ({
+  inning: inning.inning || 'Innings',
+  batting: [],
+  bowling: [],
+  totals: {
+    runs: inning.r ?? 0,
+    wickets: inning.w ?? 0,
+    overs: inning.o ?? '-',
+    extras: 0,
+  },
+}));
+
+const localMatchInfo = (match) => ({
+  ...match,
+  scheduledTime: match.scheduledTime || match.dateTimeGMT || 'Time unavailable',
+  squads: match.squads || (match.teams || []).map((team) => ({
+    team,
+    players: ['Squad details unavailable'],
+  })),
+  highlights: match.highlights || [
+    ...(match.status ? [{ title: 'Status', value: match.status }] : []),
+    ...(match.matchWinner ? [{ title: 'Winner', value: match.matchWinner }] : []),
+  ],
+});
+
+const localScorecard = (match) => ({
+  ...match,
+  scorecard: Array.isArray(match.scorecard) && match.scorecard.length
+    ? match.scorecard
+    : scoreSummaryToScorecard(match.score || []),
+  commentary: match.commentary || [],
+  highlights: match.highlights || [
+    ...(match.status ? [{ title: 'Status', value: match.status }] : []),
+    ...(match.matchWinner ? [{ title: 'Winner', value: match.matchWinner }] : []),
+  ],
+});
 
 const matchText = (match) => normalized([
   match?.name,
@@ -987,7 +1119,23 @@ export async function onRequest(context) {
         }, match ? {} : { status: 404 });
       }
 
+      const demoMatch = findDemoMatch(id);
+      if (demoMatch) {
+        return json({
+          status: 'success',
+          data: localScorecard(demoMatch),
+          info: { source: 'local-scorecard-fallback', reason: 'Loaded local score summary because provider scorecard data is unavailable.' },
+        });
+      }
+
       const data = await providerRequest(env, 'match_scorecard', { id });
+      if (!hasUsableData(data)) {
+        return json({
+          status: 'failure',
+          data: null,
+          info: { ...(data.info || {}), reason: data.info?.reason || 'Match scorecard not found.' },
+        }, { status: 404 });
+      }
       return json({ status: data.status, data: data.data, info: data.info });
     }
 
@@ -1002,7 +1150,23 @@ export async function onRequest(context) {
         }, match ? {} : { status: 404 });
       }
 
+      const demoMatch = findDemoMatch(id);
+      if (demoMatch) {
+        return json({
+          status: 'success',
+          data: localMatchInfo(demoMatch),
+          info: { source: 'local-match-fallback', reason: 'Loaded local match detail because provider score data is unavailable.' },
+        });
+      }
+
       const data = await providerRequest(env, 'match_info', { id });
+      if (!hasUsableData(data)) {
+        return json({
+          status: 'failure',
+          data: null,
+          info: { ...(data.info || {}), reason: data.info?.reason || 'Match not found.' },
+        }, { status: 404 });
+      }
       return json({ status: data.status, data: data.data, info: data.info });
     }
 
@@ -1014,6 +1178,7 @@ export async function onRequest(context) {
       return json({
         status: 'success',
         data: uniqueById([
+          ...demoMatches,
           ...(Array.isArray(provider.data) ? provider.data : []),
           ...(Array.isArray(cricsheet.data) ? cricsheet.data.slice(0, 80) : []),
         ]),
