@@ -61,7 +61,7 @@ const request = async (path: string, params?: Record<string, string | number | u
   return extractData(payload);
 };
 
-export const getMatches = async () => request('/matches');
+export const getMatches = async (params?: { feed?: string; tournament?: string }) => request('/matches', params);
 
 export const getMatchInfo = async (id: string) => request(`/matches/${id}`);
 

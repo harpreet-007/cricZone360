@@ -8,6 +8,23 @@ import socket from '@/lib/socket';
 import { MapPin, Clock, ChevronRight, Radio, MessageSquareText } from 'lucide-react';
 import Link from 'next/link';
 
+const TeamLogo = ({ match, index, tone }: { match: CricketMatch; index: number; tone: 'blue' | 'yellow' }) => {
+  const image = match.teamInfo?.[index]?.img;
+  const toneClass = tone === 'blue'
+    ? 'bg-blue-50 text-blue-700 ring-blue-100 group-hover:bg-blue-600 group-hover:text-white dark:bg-blue-950/40 dark:ring-blue-900/60'
+    : 'bg-amber-50 text-amber-700 ring-amber-100 group-hover:bg-amber-500 group-hover:text-white dark:bg-amber-950/40 dark:ring-amber-900/60';
+
+  return (
+    <div className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl font-black shadow-sm ring-1 transition-all duration-300 ${toneClass}`}>
+      {image ? (
+        <img src={image} alt={`${teamName(match, index)} logo`} className="h-full w-full object-cover" />
+      ) : (
+        teamShort(match, index)
+      )}
+    </div>
+  );
+};
+
 const LiveScores = () => {
   const [matches, setMatches] = useState<CricketMatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +33,7 @@ const LiveScores = () => {
   useEffect(() => {
     const fetchMatches = async () => {
       try {
-        const data = await getMatches();
+        const data = await getMatches({ feed: 'live' });
         const liveMatches = asArray<CricketMatch>(data).filter((m) => m.matchStarted && !m.matchEnded);
         setMatches(liveMatches);
       } catch (error) {
@@ -53,7 +70,7 @@ const LiveScores = () => {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="animate-pulse bg-white dark:bg-gray-900 rounded-2xl h-64 border border-gray-100 dark:border-gray-800"></div>
+          <div key={i} className="cz-shimmer rounded-2xl h-64 border border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"></div>
         ))}
       </div>
     );
@@ -74,9 +91,7 @@ const LiveScores = () => {
         <div className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
           <Clock className="text-gray-400" size={32} />
         </div>
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Matches Live Right Now</h3>
-        <p className="text-gray-500 max-w-xs mx-auto text-sm">Check the upcoming section for the next thrill or view recent results.</p>
-        <button className="mt-6 text-blue-600 font-bold text-sm hover:underline">View Full Schedule</button>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No live matches currently available.</h3>
       </div>
     );
   }
@@ -101,22 +116,21 @@ const LiveScores = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {matches.map((match) => (
-          <div key={match.id} className="bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-xl border border-gray-100 dark:border-gray-800 hover:shadow-2xl transition-all duration-300 group cursor-pointer relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500"></div>
+          <div key={match.id} className="cz-card-motion group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)] dark:border-gray-800 dark:bg-gray-900/95 dark:shadow-black/30">
+            <div className="absolute inset-x-0 top-0 h-1 bg-red-500"></div>
+            <div className="absolute right-0 top-0 h-24 w-24 rounded-bl-full bg-red-500/5"></div>
             
             <div className="flex justify-between items-start mb-6">
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{match.series}</span>
               <div className="flex items-center gap-2">
-                <span className="bg-red-50 dark:bg-red-900/20 text-red-600 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-tighter animate-pulse">Live</span>
+                <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-tighter text-red-600 ring-1 ring-red-100 dark:bg-red-950/40 dark:ring-red-900/60 animate-pulse">LIVE</span>
               </div>
             </div>
             
             <div className="space-y-5">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center font-black text-gray-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                    {teamShort(match, 0)}
-                  </div>
+                  <TeamLogo match={match} index={0} tone="blue" />
                   <span className="font-bold text-gray-900 dark:text-white">{teamName(match, 0)}</span>
                 </div>
                 <div className="text-right">
@@ -131,9 +145,7 @@ const LiveScores = () => {
               
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center font-black text-gray-400 group-hover:bg-yellow-500 group-hover:text-white transition-colors">
-                    {teamShort(match, 1)}
-                  </div>
+                  <TeamLogo match={match} index={1} tone="yellow" />
                   <span className="font-bold text-gray-900 dark:text-white">{teamName(match, 1)}</span>
                 </div>
                 <div className="text-right">

@@ -1856,32 +1856,114 @@ const womenTournamentSeriesForQuery = (query) => womenTournamentSeries.filter((s
   archiveIncludesQuery(series, query)
 );
 
-const getMatches = async () => {
-  const [current, scheduled] = await Promise.all([
-    withFallback('currentMatches', { offset: 0 }, demoMatches),
-    withFallback('matches', { offset: 0 }, []),
-  ]);
+const hasResultCardData = (match) =>
+  match?.matchEnded === true &&
+  (match.teams || []).length >= 2 &&
+  (match.score || []).length > 0;
 
-  const data = mergeById([
-    ...(Array.isArray(current.data) ? current.data : []),
-    ...(Array.isArray(scheduled.data) ? scheduled.data : []),
-  ]);
+const resultMatchText = (match) => [
+  match?.name,
+  match?.series,
+  match?.matchType,
+  match?.venue,
+  match?.status,
+  ...(match?.teams || []),
+  ...(match?.teamInfo || []).map((team) => `${team.name || ''} ${team.shortname || ''}`),
+].join(' ').toLowerCase();
 
-  if (data.length === 0) {
-    const cricsheetMatches = await cricsheetApi.getMatches().catch(() => ({ data: [], info: {} }));
+const matchesRecentTournament = (match, tournament = 'all') => {
+  if (!tournament || tournament === 'all') return true;
+  const text = resultMatchText(match);
+  const isIpl = text.includes('indian premier league') || /\bipl\b/.test(text);
+  const isWpl = text.includes("women's premier league") || text.includes('women premier league') || /\bwpl\b/.test(text);
+  const isAshes = text.includes('ashes');
+  const isU19 = text.includes('u19') || text.includes('under-19') || text.includes('under 19');
+  const isWomen = text.includes('women');
+  const isWorldCup = text.includes('world cup');
+  const isQualifierOrLeague = text.includes('qualifier') || text.includes('league');
+
+  if (tournament === 'ipl') return isIpl;
+  if (tournament === 'wpl') return isWpl;
+  if (tournament === 'the-ashes') return isAshes;
+  if (tournament === 'icc-world-cup') return isWorldCup && !isU19 && !isWomen && !isQualifierOrLeague;
+  if (tournament === 'u19-womens-world-cup') return isWorldCup && isU19 && isWomen;
+  if (tournament === 'u19-world-cup') return isWorldCup && isU19 && !isWomen;
+  if (tournament === 'other') return !isIpl && !isWpl && !isAshes && !(isWorldCup && !isU19) && !(isWorldCup && isU19);
+
+  return true;
+};
+
+const providerOnlyMatches = async (endpoint, params = {}, sourceLabel) => {
+  const payload = await withFallback(endpoint, params, []);
+  return {
+    status: 'success',
+    data: Array.isArray(payload.data) ? payload.data : [],
+    info: {
+      ...(payload.info || {}),
+      source: sourceLabel,
+    },
+  };
+};
+
+const getMatches = async (options = {}) => {
+  if (options.feed === 'live') {
+    const payload = await providerOnlyMatches('currentMatches', { offset: 0 }, 'provider-live');
+    return {
+      ...payload,
+      data: payload.data.filter((match) => match.matchStarted === true && match.matchEnded !== true),
+    };
+  }
+
+  if (options.feed === 'upcoming') {
+    const payload = await providerOnlyMatches('matches', { offset: 0 }, 'provider-upcoming');
+    return {
+      ...payload,
+      data: payload.data.filter((match) => match.matchStarted === false && match.matchEnded === false),
+    };
+  }
+
+  if (options.feed === 'recent') {
+    const tournament = options.tournament || 'all';
+    const [current, scheduled, cricsheetRecent] = await Promise.all([
+      providerOnlyMatches('currentMatches', { offset: 0 }, 'provider-recent-current'),
+      providerOnlyMatches('matches', { offset: 0 }, 'provider-recent-matches'),
+      cricsheetApi.getRecentMatches(20, tournament).catch((error) => ({
+        status: 'failure',
+        data: [],
+        info: { source: 'cricsheet', reason: error.message },
+      })),
+    ]);
+
+    const data = mergeById([
+      ...current.data,
+      ...scheduled.data,
+      ...(Array.isArray(cricsheetRecent.data) ? cricsheetRecent.data : []),
+    ])
+      .filter(hasResultCardData)
+      .filter((match) => matchesRecentTournament(match, tournament))
+      .sort((a, b) => new Date(b.dateTimeGMT || b.date || 0).getTime() - new Date(a.dateTimeGMT || a.date || 0).getTime());
+
     return {
       status: 'success',
-      data: mergeById([
-        ...demoMatches,
-        ...(Array.isArray(cricsheetMatches.data) ? cricsheetMatches.data : []),
-      ]),
+      data,
       info: {
-        source: 'local-demo+cricsheet',
-        reason: current.info?.reason || scheduled.info?.reason || 'Provider unavailable; loaded demo live cards and Cricsheet archive matches.',
-        cricsheet: cricsheetMatches.info || {},
+        current: current.info,
+        scheduled: scheduled.info,
+        cricsheet: cricsheetRecent.info || {},
+        source: 'provider+cricsheet-recent',
       },
     };
   }
+
+  const [current, scheduled] = await Promise.all([
+    providerOnlyMatches('currentMatches', { offset: 0 }, 'provider-current'),
+    providerOnlyMatches('matches', { offset: 0 }, 'provider-matches'),
+  ]);
+
+  const data = mergeById([
+    ...current.data,
+    ...scheduled.data,
+  ]);
 
   return {
     status: 'success',
@@ -1889,7 +1971,7 @@ const getMatches = async () => {
     info: {
       ...(current.info || {}),
       secondarySource: scheduled.info?.source,
-      source: data.length ? 'provider' : current.info?.source || scheduled.info?.source || 'provider',
+      source: 'provider',
       reason: data.length ? undefined : current.info?.reason || scheduled.info?.reason || 'No matches returned by provider',
     },
   };

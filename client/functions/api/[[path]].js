@@ -597,6 +597,39 @@ const matchText = (match) => normalized([
   ...(match?.teamInfo || []).map((team) => `${team.name || ''} ${team.shortname || ''}`),
 ].join(' '));
 
+const recentKeysForTournament = (tournament = 'all') => {
+  if (tournament === 'ipl') return ['ipl'];
+  if (tournament === 'wpl') return ['wpl'];
+  if (tournament === 'the-ashes') return ['tests'];
+  if (tournament === 'icc-world-cup') return ['odis'];
+  if (tournament === 'u19-womens-world-cup') return ['t20s'];
+  if (tournament === 'u19-world-cup') return ['odis', 't20s'];
+  if (tournament === 'other') return ['tests', 'odis', 't20s'];
+  return ['ipl', 'wpl', 'tests', 'odis', 't20s'];
+};
+
+const matchesRecentTournament = (match, tournament = 'all') => {
+  if (!tournament || tournament === 'all') return true;
+  const text = matchText(match);
+  const isIpl = text.includes('indian premier league') || /\bipl\b/.test(text);
+  const isWpl = text.includes("women's premier league") || text.includes('women premier league') || /\bwpl\b/.test(text);
+  const isAshes = text.includes('ashes');
+  const isU19 = text.includes('u19') || text.includes('under-19') || text.includes('under 19');
+  const isWomen = text.includes('women');
+  const isWorldCup = text.includes('world cup');
+  const isQualifierOrLeague = text.includes('qualifier') || text.includes('league');
+
+  if (tournament === 'ipl') return isIpl;
+  if (tournament === 'wpl') return isWpl;
+  if (tournament === 'the-ashes') return isAshes;
+  if (tournament === 'icc-world-cup') return isWorldCup && !isU19 && !isWomen && !isQualifierOrLeague;
+  if (tournament === 'u19-womens-world-cup') return isWorldCup && isU19 && isWomen;
+  if (tournament === 'u19-world-cup') return isWorldCup && isU19 && !isWomen;
+  if (tournament === 'other') return !isIpl && !isWpl && !isAshes && !(isWorldCup && !isU19) && !(isWorldCup && isU19);
+
+  return true;
+};
+
 const aliasCandidates = (term) => {
   const aliases = {
     ipl: ['ipl', 'indian premier league'],
@@ -677,6 +710,28 @@ const searchCricsheetMatches = async (query, options = {}) => {
     info: {
       source: 'cricsheet',
       reason: `Loaded real match data from ${datasets.map((dataset) => dataset.label).join(', ')}`,
+    },
+  };
+};
+
+const getRecentCricsheetMatches = async (limit = 20, tournament = 'all') => {
+  const datasets = await loadCricsheetDatasets(recentKeysForTournament(tournament));
+  const matches = uniqueById(datasets.flatMap((dataset) => dataset.summaries))
+    .filter((match) =>
+      match.matchEnded === true &&
+      (match.teams || []).length >= 2 &&
+      (match.score || []).length > 0 &&
+      matchesRecentTournament(match, tournament)
+    )
+    .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+    .slice(0, limit);
+
+  return {
+    status: 'success',
+    data: matches,
+    info: {
+      source: 'cricsheet',
+      reason: 'Loaded recent completed matches from IPL, WPL, Tests, ODIs, and T20 internationals.',
     },
   };
 };
@@ -1185,18 +1240,60 @@ export async function onRequest(context) {
     }
 
     if (path[0] === 'matches') {
-      const [provider, cricsheet] = await Promise.all([
-        getProviderMatches(env).catch(() => ({ data: [], info: {} })),
-        searchCricsheetMatches('IPL').catch(() => ({ data: [], info: {} })),
-      ]);
+      const feed = url.searchParams.get('feed') || '';
+      if (feed === 'live') {
+        const provider = await providerRequest(env, 'currentMatches', { offset: 0 }).catch(() => ({ data: [], info: {} }));
+        const matches = (Array.isArray(provider.data) ? provider.data : [])
+          .filter((match) => match.matchStarted === true && match.matchEnded !== true);
+        return json({
+          status: 'success',
+          data: matches,
+          info: { provider: provider.info, source: 'provider-live' },
+        });
+      }
+
+      if (feed === 'upcoming') {
+        const provider = await providerRequest(env, 'matches', { offset: 0 }).catch(() => ({ data: [], info: {} }));
+        const matches = (Array.isArray(provider.data) ? provider.data : [])
+          .filter((match) => match.matchStarted === false && match.matchEnded === false);
+        return json({
+          status: 'success',
+          data: matches,
+          info: { provider: provider.info, source: 'provider-upcoming' },
+        });
+      }
+
+      if (feed === 'recent') {
+        const tournament = url.searchParams.get('tournament') || 'all';
+        const [current, scheduled, cricsheetRecent] = await Promise.all([
+          providerRequest(env, 'currentMatches', { offset: 0 }).catch(() => ({ data: [], info: {} })),
+          providerRequest(env, 'matches', { offset: 0 }).catch(() => ({ data: [], info: {} })),
+          getRecentCricsheetMatches(20, tournament).catch((error) => ({ data: [], info: { source: 'cricsheet', reason: error.message } })),
+        ]);
+        const matches = uniqueById([
+          ...(Array.isArray(current.data) ? current.data : []),
+          ...(Array.isArray(scheduled.data) ? scheduled.data : []),
+          ...(Array.isArray(cricsheetRecent.data) ? cricsheetRecent.data : []),
+        ])
+          .filter((match) =>
+            match.matchEnded === true &&
+            (match.teams || []).length >= 2 &&
+            (match.score || []).length > 0 &&
+            matchesRecentTournament(match, tournament)
+          )
+          .sort((a, b) => new Date(b.dateTimeGMT || b.date || 0).getTime() - new Date(a.dateTimeGMT || a.date || 0).getTime());
+        return json({
+          status: 'success',
+          data: matches,
+          info: { current: current.info, scheduled: scheduled.info, cricsheet: cricsheetRecent.info, source: 'provider+cricsheet-recent' },
+        });
+      }
+
+      const provider = await getProviderMatches(env).catch(() => ({ data: [], info: {} }));
       return json({
         status: 'success',
-        data: uniqueById([
-          ...demoMatches,
-          ...(Array.isArray(provider.data) ? provider.data : []),
-          ...(Array.isArray(cricsheet.data) ? cricsheet.data.slice(0, 80) : []),
-        ]),
-        info: { provider: provider.info, cricsheet: cricsheet.info },
+        data: Array.isArray(provider.data) ? provider.data : [],
+        info: { provider: provider.info, source: 'provider' },
       });
     }
 

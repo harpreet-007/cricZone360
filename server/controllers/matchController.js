@@ -28,7 +28,7 @@ const sendProviderData = (res, payload, fallback) => {
  * @access  Public
  */
 const getMatches = asyncHandler(async (req, res) => {
-  const matches = await cricketApi.getMatches();
+  const matches = await cricketApi.getMatches({ feed: req.query.feed, tournament: req.query.tournament });
   sendProviderData(res, matches, []);
 });
 

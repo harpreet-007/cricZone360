@@ -16,8 +16,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
+        <Script id="theme-preference" strategy="beforeInteractive">
+          {`try{var t=localStorage.getItem('criczone-theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d);}catch(e){}`}
+        </Script>
         <Script src="/config.js" strategy="beforeInteractive" />
         {children}
       </body>

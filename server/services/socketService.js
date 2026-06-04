@@ -5,7 +5,7 @@ const initSocketUpdates = (io) => {
   setInterval(async () => {
     try {
       console.log('[Socket] Fetching live updates...');
-      const matches = await cricketApi.getMatches();
+      const matches = await cricketApi.getMatches({ feed: 'live' });
       const liveMatches = (Array.isArray(matches.data) ? matches.data : [])
         .filter(m => m.matchStarted && !m.matchEnded);
       

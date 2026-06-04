@@ -24,25 +24,64 @@ const categories = [
   { label: 'U19 Cricket', keywords: ['u19', 'under-19', 'under 19'] },
 ];
 
+const LIVE_FEED_LIMIT = 10;
+const LIVE_FEED_REFRESH_MS = 45000;
+
+const matchTimestamp = (match: CricketMatch) =>
+  new Date(match.dateTimeGMT || match.date || 0).getTime() || 0;
+
+const liveFeedKey = (match: CricketMatch) =>
+  match.id || [
+    match.name,
+    match.series,
+    match.dateTimeGMT || match.date,
+    ...(match.teams || []),
+  ].filter(Boolean).join('|').toLowerCase();
+
+const mergeLatestFeedItems = (matches: CricketMatch[]) => {
+  const unique = new Map<string, CricketMatch>();
+
+  matches
+    .filter((match) => match.name || match.teams?.length || match.status)
+    .sort((a, b) => matchTimestamp(b) - matchTimestamp(a))
+    .forEach((match) => {
+      const key = liveFeedKey(match);
+      if (key && !unique.has(key)) unique.set(key, match);
+    });
+
+  return Array.from(unique.values()).slice(0, LIVE_FEED_LIMIT);
+};
+
 export const TrendingFromLive = () => {
   const [matches, setMatches] = useState<CricketMatch[]>([]);
 
   useEffect(() => {
-    getMatches()
-      .then((data) => {
-        const orderedMatches = asArray<CricketMatch>(data)
-          .filter((match) => match.name || match.teams?.length || match.status)
-          .sort((a, b) => {
-            const statusWeight = (match: CricketMatch) => match.matchStarted && !match.matchEnded ? 0 : match.matchEnded ? 1 : 2;
-            const statusDelta = statusWeight(a) - statusWeight(b);
-            if (statusDelta) return statusDelta;
-            return new Date(b.dateTimeGMT || b.date || 0).getTime() - new Date(a.dateTimeGMT || a.date || 0).getTime();
-          })
-          .slice(0, 12);
+    let active = true;
 
-        setMatches(orderedMatches);
-      })
-      .catch(() => setMatches([]));
+    const refreshFeed = async () => {
+      try {
+        const [liveData, recentData] = await Promise.all([
+          getMatches({ feed: 'live' }).catch(() => []),
+          getMatches({ feed: 'recent' }).catch(() => []),
+        ]);
+
+        if (!active) return;
+        setMatches(mergeLatestFeedItems([
+          ...asArray<CricketMatch>(liveData),
+          ...asArray<CricketMatch>(recentData),
+        ]));
+      } catch {
+        if (active) setMatches([]);
+      }
+    };
+
+    refreshFeed();
+    const interval = window.setInterval(refreshFeed, LIVE_FEED_REFRESH_MS);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
   }, []);
 
   const headlines = matches

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Search, Menu, X, ChevronDown } from 'lucide-react';
 import GoogleTranslate from './GoogleTranslate';
+import ThemeToggle from './ThemeToggle';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -11,24 +12,14 @@ const Navbar = () => {
 
   const navLinks = [
     { name: 'Home', href: '/' },
+    { name: 'Search', href: '/search' },
     { name: 'Live Scores', href: '/live-scores' },
-    { name: 'News', href: '/news' },
-    { name: 'IPL', href: '/search?q=IPL' },
-    { name: 'History', href: '/history' },
+    { name: 'Latest News', href: '/news' },
   ];
 
   const moreLinks = [
-    { name: 'Series Search', href: '/#series-search' },
     { name: 'Upcoming Matches', href: '/live-scores#upcoming-matches' },
-    { name: 'Upcoming Series', href: '/#upcoming-series' },
-    { name: 'Latest Cricket News', href: '/news' },
     { name: 'Recent Results', href: '/live-scores#recent-results' },
-    { name: 'Rankings', href: '/search?q=rankings' },
-    { name: 'ICC Events', href: '/search?q=ICC' },
-    { name: 'Stadiums', href: '/search?q=stadium' },
-    { name: 'Records', href: '/search?q=records' },
-    { name: 'Women\'s Cricket', href: '/search?q=Women%27s%20Cricket' },
-    { name: 'U19', href: '/search?q=U19' },
   ];
 
   const submitSearch = (event: React.FormEvent) => {
@@ -96,7 +87,11 @@ const Navbar = () => {
           <div className="hidden lg:block ml-4">
             <GoogleTranslate />
           </div>
+          <div className="hidden md:block ml-3">
+            <ThemeToggle />
+          </div>
           <div className="md:hidden flex items-center">
+            <ThemeToggle />
             <button onClick={() => setIsOpen(!isOpen)} className="p-2">
               {isOpen ? <X /> : <Menu />}
             </button>
@@ -108,14 +103,11 @@ const Navbar = () => {
       {isOpen && (
         <div className="md:hidden bg-blue-900 px-2 pt-2 pb-3 space-y-1 sm:px-3">
           <Link href="/" className="block px-3 py-2 rounded-md text-base font-medium">Home</Link>
+          <Link href="/search" className="block px-3 py-2 rounded-md text-base font-medium">Search</Link>
           <Link href="/live-scores" className="block px-3 py-2 rounded-md text-base font-medium">Live Scores</Link>
-          <Link href="/news" className="block px-3 py-2 rounded-md text-base font-medium">News</Link>
-          <Link href="/#series-search" className="block px-3 py-2 rounded-md text-base font-medium">Series Search</Link>
-          <Link href="/live-scores#upcoming-matches" className="block px-3 py-2 rounded-md text-base font-medium">Upcoming</Link>
-          <Link href="/news" className="block px-3 py-2 rounded-md text-base font-medium">Latest Cricket News</Link>
+          <Link href="/news" className="block px-3 py-2 rounded-md text-base font-medium">Latest News</Link>
+          <Link href="/live-scores#upcoming-matches" className="block px-3 py-2 rounded-md text-base font-medium">Upcoming Matches</Link>
           <Link href="/live-scores#recent-results" className="block px-3 py-2 rounded-md text-base font-medium">Recent Results</Link>
-          <Link href="/search?q=schedule" className="block px-3 py-2 rounded-md text-base font-medium">Schedule</Link>
-          <Link href="/search?q=results" className="block px-3 py-2 rounded-md text-base font-medium">Results</Link>
           <div className="px-3 py-2">
             <GoogleTranslate />
           </div>

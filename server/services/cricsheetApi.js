@@ -481,6 +481,39 @@ const matchText = (match) => normalized([
   ...(match.playerNames || []),
 ].join(' '));
 
+const tournamentKeysForRecent = (tournament = 'all') => {
+  if (tournament === 'ipl') return ['ipl'];
+  if (tournament === 'wpl') return ['wpl'];
+  if (tournament === 'the-ashes') return ['tests'];
+  if (tournament === 'icc-world-cup') return ['odis'];
+  if (tournament === 'u19-womens-world-cup') return ['t20s'];
+  if (tournament === 'u19-world-cup') return ['odis', 't20s'];
+  if (tournament === 'other') return ['tests', 'odis', 't20s'];
+  return ['ipl', 'wpl', 'tests', 'odis', 't20s'];
+};
+
+const isRecentTournamentMatch = (match, tournament = 'all') => {
+  if (!tournament || tournament === 'all') return true;
+  const text = matchText(match);
+  const isIpl = text.includes('indian premier league') || /\bipl\b/.test(text);
+  const isWpl = text.includes("women's premier league") || text.includes('women premier league') || /\bwpl\b/.test(text);
+  const isAshes = text.includes('ashes');
+  const isU19 = text.includes('u19') || text.includes('under-19') || text.includes('under 19');
+  const isWomen = text.includes('women');
+  const isWorldCup = text.includes('world cup');
+  const isQualifierOrLeague = text.includes('qualifier') || text.includes('league');
+
+  if (tournament === 'ipl') return isIpl;
+  if (tournament === 'wpl') return isWpl;
+  if (tournament === 'the-ashes') return isAshes;
+  if (tournament === 'icc-world-cup') return isWorldCup && !isU19 && !isWomen && !isQualifierOrLeague;
+  if (tournament === 'u19-womens-world-cup') return isWorldCup && isU19 && isWomen;
+  if (tournament === 'u19-world-cup') return isWorldCup && isU19 && !isWomen;
+  if (tournament === 'other') return !isIpl && !isWpl && !isAshes && !(isWorldCup && !isU19) && !(isWorldCup && isU19);
+
+  return true;
+};
+
 const searchMatches = async (query, options = {}) => {
   const keys = datasetKeysForQuery(query);
   const datasets = await loadDatasets(keys);
@@ -512,6 +545,28 @@ const searchMatches = async (query, options = {}) => {
     info: {
       source: 'cricsheet',
       reason: `Loaded real match data from ${datasets.map((dataset) => dataset.label).join(', ')}`,
+    },
+  };
+};
+
+const getRecentMatches = async (limit = 20, tournament = 'all') => {
+  const datasets = await loadDatasets(tournamentKeysForRecent(tournament));
+  const matches = uniqueById(datasets.flatMap((dataset) => dataset.summaries))
+    .filter((match) =>
+      match.matchEnded === true &&
+      (match.teams || []).length >= 2 &&
+      (match.score || []).length > 0 &&
+      isRecentTournamentMatch(match, tournament)
+    )
+    .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+    .slice(0, limit);
+
+  return {
+    status: 'success',
+    data: matches,
+    info: {
+      source: 'cricsheet',
+      reason: 'Loaded recent completed matches from IPL, WPL, Tests, ODIs, and T20 internationals.',
     },
   };
 };
@@ -812,6 +867,7 @@ const getSeries = async (query = '') => {
 
 module.exports = {
   getMatches,
+  getRecentMatches,
   getMatchInfo,
   getSeries,
   searchMatches,
