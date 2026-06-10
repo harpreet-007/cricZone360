@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { getMatches } from '@/lib/api';
 import { logClientWarning } from '@/lib/clientError';
-import { asArray, CricketMatch, formatMatchDateTime, scoreForTeam, sortByDateDesc, teamName, teamShort } from '@/lib/cricket';
+import { asArray, CricketMatch, formatMatchDateTime, isCompletedMatch, scoreForTeam, sortByDateDesc, teamName, teamShort } from '@/lib/cricket';
 import { MapPin, Trophy, Zap } from 'lucide-react';
 import Link from 'next/link';
 
@@ -42,10 +42,9 @@ const RecentResults = () => {
       try {
         const data = await getMatches({ feed: 'recent', tournament: selectedTournament });
         const ended = sortByDateDesc(asArray<CricketMatch>(data).filter((match) =>
-          match.matchEnded &&
-          (match.teams || []).length >= 2 &&
-          (match.score || []).length > 0
-        )).slice(0, 6);
+          isCompletedMatch(match) &&
+          (match.teams || []).length >= 2
+        ));
         setMatches(ended);
       } catch (error) {
         logClientWarning('Error fetching recent results', error);
@@ -55,6 +54,8 @@ const RecentResults = () => {
     };
 
     fetchMatches();
+    const interval = window.setInterval(fetchMatches, 60000);
+    return () => window.clearInterval(interval);
   }, [selectedTournament]);
 
   return (

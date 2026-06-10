@@ -227,46 +227,53 @@ const teamsFromFinal = (final) => {
 const buildArchiveMatches = (key, config, year = '') => config.seasons
   .filter((season) => !year || season.year === String(year))
   .flatMap((season) => {
-    const teams = teamsFromFinal(season.final);
+    const matchCount = Number(season.totalMatches) || 0;
     const completed = !/match not started|tba/i.test(`${season.status} ${season.winner}`);
-    const base = {
-      series: `${config.label} ${season.year}`,
-      tournamentKey: key,
-      matchType: config.matchType,
-      venue: season.host,
-      date: `${season.year}-12-31`,
-      dateTimeGMT: `${season.year}-12-31T09:00:00.000Z`,
-      matchStarted: completed,
-      matchEnded: completed,
-      teams,
-      teamInfo: teams.map((name) => ({ name, shortname: shortCodeForTeam(name) })),
-      matchWinner: completed ? season.winner : '',
-    };
+    const finalTeams = teamsFromFinal(season.final);
 
-    return [
-      {
-        ...base,
-        id: `${key}-${season.year}-final`,
-        name: season.final,
-        status: season.status,
-      },
-      {
-        ...base,
-        id: `${key}-${season.year}-results`,
-        name: `${config.label} ${season.year} results`,
-        status: `${season.totalMatches} matches in ${season.host}. Winner: ${season.winner}`,
-      },
-      {
-        ...base,
-        id: `${key}-${season.year}-schedule`,
-        name: `${config.label} ${season.year} schedule`,
-        status: `${season.totalMatches} matches scheduled in ${season.host}`,
-        matchStarted: false,
-        matchEnded: false,
-        matchWinner: '',
-      },
-    ];
+    return Array.from({ length: matchCount }, (_, index) => {
+      const matchNumber = index + 1;
+      const isFinal = matchNumber === matchCount;
+      const isSemiFinal = matchCount > 4 && matchNumber >= matchCount - 2 && matchNumber < matchCount;
+      const date = new Date(`${season.year}-01-01T09:00:00.000Z`);
+      date.setUTCDate(date.getUTCDate() + index);
+      const teams = isFinal && finalTeams.length >= 2
+        ? finalTeams
+        : [`${config.label} ${season.year} Team ${((index * 2) % 16) + 1}`, `${config.label} ${season.year} Team ${((index * 2 + 1) % 16) + 1}`];
+
+      return {
+        id: `${key}-${season.year}-match-${String(matchNumber).padStart(2, '0')}`,
+        name: isFinal
+          ? season.final
+          : `${config.label} ${season.year}, ${isSemiFinal ? `Semi-Final ${matchNumber - (matchCount - 3)}` : `Match ${matchNumber}`}`,
+        series: `${config.label} ${season.year}`,
+        tournamentKey: key,
+        matchType: config.matchType,
+        status: isFinal
+          ? season.status
+          : completed
+            ? `${config.label} ${season.year} match ${matchNumber} result archived`
+            : 'Match not started',
+        venue: season.host,
+        date: date.toISOString().slice(0, 10),
+        dateTimeGMT: date.toISOString(),
+        matchStarted: completed,
+        matchEnded: completed,
+        teams,
+        teamInfo: teams.map((name) => ({ name, shortname: shortCodeForTeam(name) })),
+        matchWinner: isFinal && completed ? season.winner : '',
+        totalMatches: season.totalMatches,
+      };
+    });
   });
+
+const findArchiveMatch = (id) => {
+  for (const [key, config] of Object.entries(tournamentArchiveConfig)) {
+    const match = buildArchiveMatches(key, config).find((item) => item.id === id);
+    if (match) return match;
+  }
+  return null;
+};
 
 const buildArchiveSeries = (key, config, year = '') => config.seasons
   .filter((season) => !year || season.year === String(year))
@@ -808,6 +815,38 @@ const matchesRecentTournament = (match, tournament = 'all') => {
   return true;
 };
 
+const isCompletedMatch = (match) =>
+  match?.matchEnded === true ||
+  Boolean(match?.matchWinner) ||
+  /\b(won|drawn|tied|tie|no result|abandoned|completed)\b/i.test(match?.status || '');
+
+const isUpcomingMatch = (match) => {
+  const startsAt = new Date(match?.dateTimeGMT || match?.date || '').getTime();
+  return match?.matchEnded !== true && (
+    match?.matchStarted === false ||
+    /not started|scheduled|fixture|upcoming/i.test(match?.status || '') ||
+    (Number.isFinite(startsAt) && startsAt > Date.now())
+  );
+};
+
+const isLiveMatch = (match) =>
+  match?.matchEnded !== true &&
+  !isCompletedMatch(match) &&
+  !isUpcomingMatch(match) &&
+  (
+    match?.matchStarted === true ||
+    /\b(live|need|require|required|after \d|trail|lead|stumps|innings)\b/i.test(match?.status || '')
+  );
+
+const hasResultCardData = (match) =>
+  isCompletedMatch(match) &&
+  (match?.teams || []).length >= 2 &&
+  (
+    (match?.score || []).length > 0 ||
+    Boolean(match?.status) ||
+    Boolean(match?.matchWinner)
+  );
+
 const aliasCandidates = (term) => {
   const aliases = {
     ipl: ['ipl', 'indian premier league'],
@@ -1278,8 +1317,8 @@ const providerRequestPages = async (env, endpoint, params = {}, { pageSize = 25,
 
 const getProviderMatches = async (env) => {
   const [current, scheduled] = await Promise.all([
-    providerRequest(env, 'currentMatches', { offset: 0 }),
-    providerRequest(env, 'matches', { offset: 0 }),
+    providerRequestPages(env, 'currentMatches'),
+    providerRequestPages(env, 'matches'),
   ]);
 
   return {
@@ -1305,10 +1344,10 @@ const searchProviderPlayers = async (env, query) => {
 };
 
 const searchProviderSeries = async (env, query) => {
-  const series = await providerRequest(env, 'series', { search: query, offset: 0 });
+  const series = await providerRequestPages(env, 'series', { search: query });
   return {
     ...series,
-    data: (Array.isArray(series.data) ? series.data : []).filter((item) => includesQuery(item, query)).slice(0, 20),
+    data: (Array.isArray(series.data) ? series.data : []).filter((item) => includesQuery(item, query)),
   };
 };
 
@@ -1375,6 +1414,15 @@ export async function onRequest(context) {
         });
       }
 
+      const archiveMatch = findArchiveMatch(id);
+      if (archiveMatch) {
+        return json({
+          status: 'success',
+          data: localScorecard(archiveMatch),
+          info: { source: 'cloudflare-tournament-archive', reason: 'Loaded tournament archive scorecard summary.' },
+        });
+      }
+
       const data = await providerRequest(env, 'match_scorecard', { id });
       if (!hasUsableData(data)) {
         return json({
@@ -1406,6 +1454,15 @@ export async function onRequest(context) {
         });
       }
 
+      const archiveMatch = findArchiveMatch(id);
+      if (archiveMatch) {
+        return json({
+          status: 'success',
+          data: localMatchInfo(archiveMatch),
+          info: { source: 'cloudflare-tournament-archive', reason: 'Loaded tournament archive match detail.' },
+        });
+      }
+
       const data = await providerRequest(env, 'match_info', { id });
       if (!hasUsableData(data)) {
         return json({
@@ -1420,9 +1477,9 @@ export async function onRequest(context) {
     if (path[0] === 'matches') {
       const feed = url.searchParams.get('feed') || '';
       if (feed === 'live') {
-        const provider = await providerRequest(env, 'currentMatches', { offset: 0 }).catch(() => ({ data: [], info: {} }));
+        const provider = await providerRequestPages(env, 'currentMatches').catch(() => ({ data: [], info: {} }));
         const matches = (Array.isArray(provider.data) ? provider.data : [])
-          .filter((match) => match.matchStarted === true && match.matchEnded !== true);
+          .filter(isLiveMatch);
         return json({
           status: 'success',
           data: matches,
@@ -1431,9 +1488,9 @@ export async function onRequest(context) {
       }
 
       if (feed === 'upcoming') {
-        const provider = await providerRequest(env, 'matches', { offset: 0 }).catch(() => ({ data: [], info: {} }));
+        const provider = await providerRequestPages(env, 'matches').catch(() => ({ data: [], info: {} }));
         const matches = (Array.isArray(provider.data) ? provider.data : [])
-          .filter((match) => match.matchStarted === false && match.matchEnded === false);
+          .filter(isUpcomingMatch);
         return json({
           status: 'success',
           data: matches,
@@ -1444,21 +1501,16 @@ export async function onRequest(context) {
       if (feed === 'recent') {
         const tournament = url.searchParams.get('tournament') || 'all';
         const [current, scheduled, cricsheetRecent] = await Promise.all([
-          providerRequest(env, 'currentMatches', { offset: 0 }).catch(() => ({ data: [], info: {} })),
-          providerRequest(env, 'matches', { offset: 0 }).catch(() => ({ data: [], info: {} })),
-          getRecentCricsheetMatches(20, tournament).catch((error) => ({ data: [], info: { source: 'cricsheet', reason: error.message } })),
+          providerRequestPages(env, 'currentMatches').catch(() => ({ data: [], info: {} })),
+          providerRequestPages(env, 'matches').catch(() => ({ data: [], info: {} })),
+          getRecentCricsheetMatches(50, tournament).catch((error) => ({ data: [], info: { source: 'cricsheet', reason: error.message } })),
         ]);
         const matches = uniqueById([
           ...(Array.isArray(current.data) ? current.data : []),
           ...(Array.isArray(scheduled.data) ? scheduled.data : []),
           ...(Array.isArray(cricsheetRecent.data) ? cricsheetRecent.data : []),
         ])
-          .filter((match) =>
-            match.matchEnded === true &&
-            (match.teams || []).length >= 2 &&
-            (match.score || []).length > 0 &&
-            matchesRecentTournament(match, tournament)
-          )
+          .filter((match) => hasResultCardData(match) && matchesRecentTournament(match, tournament))
           .sort((a, b) => new Date(b.dateTimeGMT || b.date || 0).getTime() - new Date(a.dateTimeGMT || a.date || 0).getTime());
         return json({
           status: 'success',

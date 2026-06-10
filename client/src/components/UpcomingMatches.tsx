@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { getMatches } from '@/lib/api';
 import { logClientWarning } from '@/lib/clientError';
-import { asArray, CricketMatch, formatMatchDateTime, sortByDateAsc, teamName, teamShort } from '@/lib/cricket';
+import { asArray, CricketMatch, formatMatchDateTime, isUpcomingMatch, sortByDateAsc, teamName, teamShort } from '@/lib/cricket';
 import { Calendar, MapPin, Clock, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
@@ -28,7 +28,7 @@ const UpcomingMatches = () => {
     const fetchMatches = async () => {
       try {
         const data = await getMatches({ feed: 'upcoming' });
-        const upcoming = sortByDateAsc(asArray<CricketMatch>(data).filter((m) => !m.matchStarted && !m.matchEnded)).slice(0, 6);
+        const upcoming = sortByDateAsc(asArray<CricketMatch>(data).filter(isUpcomingMatch));
         setMatches(upcoming);
         setLoading(false);
       } catch (error) {
@@ -39,6 +39,8 @@ const UpcomingMatches = () => {
     };
 
     fetchMatches();
+    const interval = window.setInterval(fetchMatches, 60000);
+    return () => window.clearInterval(interval);
   }, []);
 
   if (loading) {

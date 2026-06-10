@@ -1856,10 +1856,37 @@ const womenTournamentSeriesForQuery = (query) => womenTournamentSeries.filter((s
   archiveIncludesQuery(series, query)
 );
 
+const isCompletedMatch = (match) =>
+  match?.matchEnded === true ||
+  Boolean(match?.matchWinner) ||
+  /\b(won|drawn|tied|tie|no result|abandoned|completed)\b/i.test(match?.status || '');
+
+const isUpcomingMatch = (match) => {
+  const startsAt = new Date(match?.dateTimeGMT || match?.date || '').getTime();
+  return match?.matchEnded !== true && (
+    match?.matchStarted === false ||
+    /not started|scheduled|fixture|upcoming/i.test(match?.status || '') ||
+    (Number.isFinite(startsAt) && startsAt > Date.now())
+  );
+};
+
+const isLiveMatch = (match) =>
+  match?.matchEnded !== true &&
+  !isCompletedMatch(match) &&
+  !isUpcomingMatch(match) &&
+  (
+    match?.matchStarted === true ||
+    /\b(live|need|require|required|after \d|trail|lead|stumps|innings)\b/i.test(match?.status || '')
+  );
+
 const hasResultCardData = (match) =>
-  match?.matchEnded === true &&
-  (match.teams || []).length >= 2 &&
-  (match.score || []).length > 0;
+  isCompletedMatch(match) &&
+  (match?.teams || []).length >= 2 &&
+  (
+    (match?.score || []).length > 0 ||
+    Boolean(match?.status) ||
+    Boolean(match?.matchWinner)
+  );
 
 const resultMatchText = (match) => [
   match?.name,
@@ -1894,7 +1921,7 @@ const matchesRecentTournament = (match, tournament = 'all') => {
 };
 
 const providerOnlyMatches = async (endpoint, params = {}, sourceLabel) => {
-  const payload = await withFallback(endpoint, params, []);
+  const payload = await providerRequestPages(endpoint, params);
   return {
     status: 'success',
     data: Array.isArray(payload.data) ? payload.data : [],
@@ -1907,27 +1934,27 @@ const providerOnlyMatches = async (endpoint, params = {}, sourceLabel) => {
 
 const getMatches = async (options = {}) => {
   if (options.feed === 'live') {
-    const payload = await providerOnlyMatches('currentMatches', { offset: 0 }, 'provider-live');
+    const payload = await providerOnlyMatches('currentMatches', {}, 'provider-live');
     return {
       ...payload,
-      data: payload.data.filter((match) => match.matchStarted === true && match.matchEnded !== true),
+      data: payload.data.filter(isLiveMatch),
     };
   }
 
   if (options.feed === 'upcoming') {
-    const payload = await providerOnlyMatches('matches', { offset: 0 }, 'provider-upcoming');
+    const payload = await providerOnlyMatches('matches', {}, 'provider-upcoming');
     return {
       ...payload,
-      data: payload.data.filter((match) => match.matchStarted === false && match.matchEnded === false),
+      data: payload.data.filter(isUpcomingMatch),
     };
   }
 
   if (options.feed === 'recent') {
     const tournament = options.tournament || 'all';
     const [current, scheduled, cricsheetRecent] = await Promise.all([
-      providerOnlyMatches('currentMatches', { offset: 0 }, 'provider-recent-current'),
-      providerOnlyMatches('matches', { offset: 0 }, 'provider-recent-matches'),
-      cricsheetApi.getRecentMatches(20, tournament).catch((error) => ({
+      providerOnlyMatches('currentMatches', {}, 'provider-recent-current'),
+      providerOnlyMatches('matches', {}, 'provider-recent-matches'),
+      cricsheetApi.getRecentMatches(50, tournament).catch((error) => ({
         status: 'failure',
         data: [],
         info: { source: 'cricsheet', reason: error.message },
@@ -1956,8 +1983,8 @@ const getMatches = async (options = {}) => {
   }
 
   const [current, scheduled] = await Promise.all([
-    providerOnlyMatches('currentMatches', { offset: 0 }, 'provider-current'),
-    providerOnlyMatches('matches', { offset: 0 }, 'provider-matches'),
+    providerOnlyMatches('currentMatches', {}, 'provider-current'),
+    providerOnlyMatches('matches', {}, 'provider-matches'),
   ]);
 
   const data = mergeById([
@@ -2537,7 +2564,11 @@ const searchSeries = async (query) => {
   const fallback = [...demoSeries, ...iplArchiveSeries, ...tournamentArchiveSeries, ...u19WorldCupSeries, ...womenTournamentSeries].filter((series) =>
     series.name.toLowerCase().includes(normalized) || archiveIncludesQuery(series, query)
   );
-  const series = await withFallback('series', { search: query }, fallback);
+  const series = await providerRequestPages('series', { search: query }).catch(() => ({
+    status: 'success',
+    data: fallback,
+    info: { source: 'local-series-fallback' },
+  }));
 
   if (!Array.isArray(series.data) || series.data.length === 0) {
     const cricsheetSeries = await cricsheetApi.getSeries(query);
@@ -2545,6 +2576,7 @@ const searchSeries = async (query) => {
       ...cricsheetSeries,
       data: mergeById([
         ...(Array.isArray(cricsheetSeries.data) ? cricsheetSeries.data : []),
+        ...fallback,
         ...u19Series,
       ]),
     };
@@ -2554,6 +2586,7 @@ const searchSeries = async (query) => {
     ...series,
     data: mergeById([
       ...(Array.isArray(series.data) ? series.data : []),
+      ...fallback,
       ...u19Series,
     ]),
   };

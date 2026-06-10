@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { getMatches } from '@/lib/api';
 import { logClientWarning } from '@/lib/clientError';
-import { asArray, CricketMatch, oversForTeam, scoreForTeam, teamName, teamShort } from '@/lib/cricket';
+import { asArray, CricketMatch, isLiveMatch, oversForTeam, scoreForTeam, teamName, teamShort } from '@/lib/cricket';
 import socket from '@/lib/socket';
 import { MapPin, Clock, ChevronRight, Radio, MessageSquareText } from 'lucide-react';
 import Link from 'next/link';
@@ -34,7 +34,7 @@ const LiveScores = () => {
     const fetchMatches = async () => {
       try {
         const data = await getMatches({ feed: 'live' });
-        const liveMatches = asArray<CricketMatch>(data).filter((m) => m.matchStarted && !m.matchEnded);
+        const liveMatches = asArray<CricketMatch>(data).filter(isLiveMatch);
         setMatches(liveMatches);
       } catch (error) {
         logClientWarning('Error fetching live matches', error);
@@ -45,6 +45,7 @@ const LiveScores = () => {
     };
 
     fetchMatches();
+    const interval = window.setInterval(fetchMatches, 30000);
 
     // Listen for real-time updates
     socket.on('matchUpdate', (updatedMatch: CricketMatch) => {
@@ -62,6 +63,7 @@ const LiveScores = () => {
     });
 
     return () => {
+      window.clearInterval(interval);
       socket.off('matchUpdate');
     };
   }, []);
