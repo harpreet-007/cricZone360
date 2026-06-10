@@ -489,7 +489,7 @@ const tournamentKeysForRecent = (tournament = 'all') => {
   if (tournament === 'u19-womens-world-cup') return ['t20s'];
   if (tournament === 'u19-world-cup') return ['odis', 't20s'];
   if (tournament === 'other') return ['tests', 'odis', 't20s'];
-  return ['ipl', 'wpl', 'tests', 'odis', 't20s'];
+  return ['ipl', 'wpl'];
 };
 
 const isRecentTournamentMatch = (match, tournament = 'all') => {
