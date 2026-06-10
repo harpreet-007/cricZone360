@@ -568,6 +568,9 @@ const SearchResultsContent = () => {
     typeof row.totalMatches === 'number' ? total + row.totalMatches : total
   ), 0);
   const totalMatchesForYear = selectedSeasonSummary?.totalMatches ?? (year ? results?.matches?.length || 0 : 0);
+  const displayedMatchesCount = results?.matches?.length || 0;
+  const availableMatchesCount = Number(totalMatchesForYear) || displayedMatchesCount;
+  const hasMissingDisplayedMatches = Boolean(year && availableMatchesCount > displayedMatchesCount);
   const winnerForYear = selectedSeasonSummary?.winner || 'Winner unavailable';
   const isPlayerSearch = (results?.players?.length || 0) > 0 && queryTerms(query).length >= 2;
   const goToTournamentYear = (tournamentValue: string, nextYear: string) => {
@@ -787,6 +790,17 @@ const SearchResultsContent = () => {
         subtitle="Fixtures, scorecards, venues, and match result records"
         icon={<Trophy size={20} className="text-green-600" />}
       >
+        <div className="mb-4 flex flex-col gap-2 rounded-lg border border-green-100 bg-green-50 px-4 py-3 text-sm font-bold text-green-900 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-100 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Showing {displayedMatchesCount} of {availableMatchesCount} available matches
+            {year ? ` for ${selectedTournament.label} ${year}` : ''}
+          </span>
+          {hasMissingDisplayedMatches && (
+            <span className="text-xs font-black uppercase tracking-widest text-orange-600 dark:text-orange-300">
+              {availableMatchesCount - displayedMatchesCount} missing from list
+            </span>
+          )}
+        </div>
         {results?.matches?.length > 0 ? (
           <div className="cz-grid grid grid-cols-1 md:grid-cols-2 gap-4">
             {results.matches.map((match: any) => (
