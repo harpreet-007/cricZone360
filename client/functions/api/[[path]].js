@@ -136,6 +136,184 @@ const titleCaseName = (value) => String(value || '')
 
 const formatTerms = new Set(['t20', 't20i', 'odi', 'odis', 'test', 'tests']);
 
+const tournamentArchiveConfig = {
+  'icc-world-cup': {
+    label: 'ICC Cricket World Cup',
+    query: 'ICC Cricket World Cup',
+    matchType: 'odi',
+    seasons: [
+      { year: '2027', totalMatches: 54, winner: 'TBA', host: 'South Africa, Zimbabwe and Namibia', final: 'ICC Cricket World Cup 2027 Final', status: 'Match not started' },
+      { year: '2023', totalMatches: 48, winner: 'Australia', host: 'India', final: 'India vs Australia, Final', status: 'Australia won by 6 wickets' },
+      { year: '2019', totalMatches: 48, winner: 'England', host: 'England and Wales', final: 'England vs New Zealand, Final', status: 'England won on boundary countback' },
+      { year: '2015', totalMatches: 49, winner: 'Australia', host: 'Australia and New Zealand', final: 'Australia vs New Zealand, Final', status: 'Australia won by 7 wickets' },
+      { year: '2011', totalMatches: 49, winner: 'India', host: 'India, Sri Lanka and Bangladesh', final: 'India vs Sri Lanka, Final', status: 'India won by 6 wickets' },
+      { year: '2007', totalMatches: 51, winner: 'Australia', host: 'West Indies', final: 'Australia vs Sri Lanka, Final', status: 'Australia won by 53 runs' },
+      { year: '2003', totalMatches: 54, winner: 'Australia', host: 'South Africa, Zimbabwe and Kenya', final: 'Australia vs India, Final', status: 'Australia won by 125 runs' },
+      { year: '1999', totalMatches: 42, winner: 'Australia', host: 'England, Scotland, Ireland, Wales and Netherlands', final: 'Australia vs Pakistan, Final', status: 'Australia won by 8 wickets' },
+      { year: '1996', totalMatches: 37, winner: 'Sri Lanka', host: 'India, Pakistan and Sri Lanka', final: 'Sri Lanka vs Australia, Final', status: 'Sri Lanka won by 7 wickets' },
+      { year: '1992', totalMatches: 39, winner: 'Pakistan', host: 'Australia and New Zealand', final: 'Pakistan vs England, Final', status: 'Pakistan won by 22 runs' },
+      { year: '1987', totalMatches: 27, winner: 'Australia', host: 'India and Pakistan', final: 'Australia vs England, Final', status: 'Australia won by 7 runs' },
+      { year: '1983', totalMatches: 27, winner: 'India', host: 'England and Wales', final: 'India vs West Indies, Final', status: 'India won by 43 runs' },
+      { year: '1979', totalMatches: 15, winner: 'West Indies', host: 'England', final: 'West Indies vs England, Final', status: 'West Indies won by 92 runs' },
+      { year: '1975', totalMatches: 15, winner: 'West Indies', host: 'England', final: 'West Indies vs Australia, Final', status: 'West Indies won by 17 runs' },
+    ],
+  },
+  'the-ashes': {
+    label: 'The Ashes',
+    query: 'The Ashes',
+    matchType: 'test',
+    seasons: [
+      { year: '2027', totalMatches: 5, winner: 'TBA', host: 'England', final: 'England vs Australia, 5th Test', status: 'Match not started' },
+      { year: '2025', totalMatches: 5, winner: 'TBA', host: 'Australia', final: 'Australia vs England, 5th Test', status: 'Match not started' },
+      { year: '2023', totalMatches: 5, winner: 'Series drawn 2-2; Australia retained', host: 'England', final: 'England vs Australia, 5th Test', status: 'England won by 49 runs' },
+      { year: '2021', totalMatches: 5, winner: 'Australia', host: 'Australia', final: 'Australia vs England, 5th Test', status: 'Australia won by 146 runs' },
+      { year: '2019', totalMatches: 5, winner: 'Series drawn 2-2; Australia retained', host: 'England', final: 'England vs Australia, 5th Test', status: 'England won by 135 runs' },
+      { year: '2017', totalMatches: 5, winner: 'Australia', host: 'Australia', final: 'Australia vs England, 5th Test', status: 'Australia won by an innings and 123 runs' },
+      { year: '2015', totalMatches: 5, winner: 'England', host: 'England', final: 'England vs Australia, 5th Test', status: 'Australia won by an innings and 46 runs' },
+    ],
+  },
+  'u19-world-cup': {
+    label: 'ICC U19 Cricket World Cup',
+    query: 'ICC U19 Cricket World Cup',
+    matchType: 'odi',
+    seasons: [
+      { year: '2026', totalMatches: 41, winner: 'TBA', host: 'Zimbabwe and Namibia', final: 'ICC U19 Cricket World Cup 2026 Final', status: 'Match not started' },
+      { year: '2024', totalMatches: 41, winner: 'Australia U19', host: 'South Africa', final: 'Australia U19 vs India U19, Final', status: 'Australia U19 won by 79 runs' },
+      { year: '2022', totalMatches: 48, winner: 'India U19', host: 'West Indies', final: 'India U19 vs England U19, Final', status: 'India U19 won by 4 wickets' },
+      { year: '2020', totalMatches: 48, winner: 'Bangladesh U19', host: 'South Africa', final: 'Bangladesh U19 vs India U19, Final', status: 'Bangladesh U19 won by 3 wickets' },
+      { year: '2018', totalMatches: 48, winner: 'India U19', host: 'New Zealand', final: 'India U19 vs Australia U19, Final', status: 'India U19 won by 8 wickets' },
+      { year: '2016', totalMatches: 48, winner: 'West Indies U19', host: 'Bangladesh', final: 'West Indies U19 vs India U19, Final', status: 'West Indies U19 won by 5 wickets' },
+    ],
+  },
+  'u19-womens-world-cup': {
+    label: "ICC Women's U19 T20 World Cup",
+    query: "ICC Women's U19 T20 World Cup",
+    matchType: 't20',
+    seasons: [
+      { year: '2027', totalMatches: 41, winner: 'TBA', host: 'Bangladesh and Nepal', final: "ICC Women's U19 T20 World Cup 2027 Final", status: 'Match not started' },
+      { year: '2025', totalMatches: 41, winner: 'India U19 Women', host: 'Malaysia', final: 'India U19 Women vs South Africa U19 Women, Final', status: 'India U19 Women won by 9 wickets' },
+      { year: '2023', totalMatches: 41, winner: 'India U19 Women', host: 'South Africa', final: 'India U19 Women vs England U19 Women, Final', status: 'India U19 Women won by 7 wickets' },
+    ],
+  },
+};
+
+const archiveTournamentKeyFor = (query, tournament = '') => {
+  const q = normalized(`${tournament || ''} ${query || ''}`);
+  if (tournamentArchiveConfig[tournament]) return tournament;
+  if ((q.includes('women') || q.includes("women's")) && q.includes('u19') && q.includes('world cup')) return 'u19-womens-world-cup';
+  if (q.includes('u19') && q.includes('world cup')) return 'u19-world-cup';
+  if (q.includes('ashes')) return 'the-ashes';
+  if (q.includes('world cup') || q.includes('icc cricket world cup')) return 'icc-world-cup';
+  return '';
+};
+
+const shortCodeForTeam = (team) => String(team || '')
+  .replace(/[^A-Za-z0-9 ]/g, ' ')
+  .split(/\s+/)
+  .filter(Boolean)
+  .map((part) => part[0])
+  .join('')
+  .slice(0, 5)
+  .toUpperCase();
+
+const teamsFromFinal = (final) => {
+  const clean = String(final || '')
+    .replace(/,\s*Final.*$/i, '')
+    .replace(/,\s*\d+(st|nd|rd|th)\s+Test.*$/i, '');
+  const teams = clean.split(/\s+vs\s+/i).map((team) => team.trim()).filter(Boolean);
+  return teams.length >= 2 ? teams.slice(0, 2) : [];
+};
+
+const buildArchiveMatches = (key, config, year = '') => config.seasons
+  .filter((season) => !year || season.year === String(year))
+  .flatMap((season) => {
+    const teams = teamsFromFinal(season.final);
+    const completed = !/match not started|tba/i.test(`${season.status} ${season.winner}`);
+    const base = {
+      series: `${config.label} ${season.year}`,
+      tournamentKey: key,
+      matchType: config.matchType,
+      venue: season.host,
+      date: `${season.year}-12-31`,
+      dateTimeGMT: `${season.year}-12-31T09:00:00.000Z`,
+      matchStarted: completed,
+      matchEnded: completed,
+      teams,
+      teamInfo: teams.map((name) => ({ name, shortname: shortCodeForTeam(name) })),
+      matchWinner: completed ? season.winner : '',
+    };
+
+    return [
+      {
+        ...base,
+        id: `${key}-${season.year}-final`,
+        name: season.final,
+        status: season.status,
+      },
+      {
+        ...base,
+        id: `${key}-${season.year}-results`,
+        name: `${config.label} ${season.year} results`,
+        status: `${season.totalMatches} matches in ${season.host}. Winner: ${season.winner}`,
+      },
+      {
+        ...base,
+        id: `${key}-${season.year}-schedule`,
+        name: `${config.label} ${season.year} schedule`,
+        status: `${season.totalMatches} matches scheduled in ${season.host}`,
+        matchStarted: false,
+        matchEnded: false,
+        matchWinner: '',
+      },
+    ];
+  });
+
+const buildArchiveSeries = (key, config, year = '') => config.seasons
+  .filter((season) => !year || season.year === String(year))
+  .map((season) => ({
+    id: `${key}-${season.year}-series`,
+    name: `${config.label} ${season.year}`,
+    seriesName: `${config.label} ${season.year}`,
+    tournamentKey: key,
+    startDate: `${season.year}-01-01`,
+    endDate: `${season.year}-12-31`,
+    matches: season.totalMatches,
+    winner: season.winner,
+    venue: season.host,
+  }));
+
+const buildArchiveMetadata = (key, config) => {
+  const seasons = config.seasons
+    .map(({ year, totalMatches, winner }) => ({ year, totalMatches, winner }))
+    .sort((a, b) => Number(a.year) - Number(b.year));
+  const years = seasons.map((season) => season.year);
+
+  return {
+    key,
+    label: config.label,
+    query: config.query,
+    earliestYear: years[0] || null,
+    latestYear: years[years.length - 1] || null,
+    years,
+    seasons,
+  };
+};
+
+const searchArchiveTournament = (query, year = '', tournament = '') => {
+  const key = archiveTournamentKeyFor(query, tournament);
+  if (!key) return null;
+  const config = tournamentArchiveConfig[key];
+
+  return {
+    matches: buildArchiveMatches(key, config, year),
+    series: buildArchiveSeries(key, config, year),
+    info: {
+      source: 'cloudflare-tournament-archive',
+      reason: `Loaded ${config.label} records without fetching oversized Cricsheet archives at the edge.`,
+    },
+  };
+};
+
 const playerQueryTerms = (query) => normalized(query)
   .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
   .split(/\s+/)
@@ -1016,11 +1194,11 @@ const searchMetadata = async () => {
 
   return [
     ipl,
-    emptyMetadata('icc-world-cup', 'ICC Cricket World Cup', 'ICC Cricket World Cup'),
-    emptyMetadata('the-ashes', 'The Ashes', 'The Ashes'),
+    buildArchiveMetadata('icc-world-cup', tournamentArchiveConfig['icc-world-cup']),
+    buildArchiveMetadata('the-ashes', tournamentArchiveConfig['the-ashes']),
     wpl,
-    emptyMetadata('u19-womens-world-cup', "ICC Women's U19 T20 World Cup", "ICC Women's U19 T20 World Cup"),
-    emptyMetadata('u19-world-cup', 'ICC U19 Cricket World Cup', 'ICC U19 Cricket World Cup'),
+    buildArchiveMetadata('u19-womens-world-cup', tournamentArchiveConfig['u19-womens-world-cup']),
+    buildArchiveMetadata('u19-world-cup', tournamentArchiveConfig['u19-world-cup']),
   ];
 };
 
@@ -1337,6 +1515,23 @@ export async function onRequest(context) {
       const year = url.searchParams.get('year') || '';
       const tournament = url.searchParams.get('tournament') || '';
       const tournamentSearch = isTournamentSearch(query, tournament);
+      const archiveSearch = searchArchiveTournament(query, year, tournament);
+
+      if (archiveSearch) {
+        return json({
+          status: 'success',
+          data: {
+            players: [],
+            matches: archiveSearch.matches,
+            series: archiveSearch.series,
+            info: {
+              players: { source: 'filter', reason: 'Player search skipped for tournament query.' },
+              matches: archiveSearch.info,
+              series: archiveSearch.info,
+            },
+          },
+        });
+      }
 
       const [providerPlayers, cricsheetPlayers, cricsheetMatches, providerSeries] = await Promise.all([
         tournamentSearch ? Promise.resolve({ data: [], info: { source: 'filter', reason: 'Player search skipped for tournament query.' } }) : searchProviderPlayers(env, query).catch((error) => ({ data: [], info: { reason: error.message } })),
