@@ -448,6 +448,7 @@ const SearchResultsContent = () => {
   const [results, setResults] = useState<any>(null);
   const [metadata, setMetadata] = useState<TournamentMetadata[]>([]);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     const fetchMetadata = async () => {
@@ -463,19 +464,42 @@ const SearchResultsContent = () => {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
     const fetchResults = async () => {
       if (!query) return;
       setLoading(true);
+      setErrorMessage('');
       try {
         const data = await searchEverything(query, year, tournamentParam || undefined);
+        if (!active) return;
         setResults(data);
-        setLoading(false);
       } catch (error) {
+        if (!active) return;
         logClientWarning('Search error', error);
-        setLoading(false);
+        const message = error instanceof Error ? error.message : 'Search data is unavailable right now.';
+        setErrorMessage(message);
+        setResults({
+          players: [],
+          matches: [],
+          series: [],
+          info: {
+            search: {
+              source: 'client',
+              reason: message,
+            },
+          },
+        });
+      } finally {
+        if (active) setLoading(false);
       }
     };
+
     fetchResults();
+
+    return () => {
+      active = false;
+    };
   }, [query, year, tournamentParam]);
 
   useEffect(() => {
@@ -539,6 +563,7 @@ const SearchResultsContent = () => {
     .slice()
     .sort((a, b) => Number(a) - Number(b));
   const selectedSeasonSummary = year ? availableRows[year] : null;
+  const isTournamentSearch = Boolean(tournamentParam || selectedTournamentOption.aliases.some((alias) => normalizedQuery.includes(alias)));
   const allYearsTotal = Object.values(availableRows).reduce((total, row) => (
     typeof row.totalMatches === 'number' ? total + row.totalMatches : total
   ), 0);
@@ -656,7 +681,7 @@ const SearchResultsContent = () => {
             <div>
               <p className="font-bold">Live cricket provider did not return data for this search.</p>
               <p className="mt-1 text-sm">
-                {[results.info.matches?.reason, results.info.players?.reason, results.info.series?.reason]
+                {[errorMessage, results.info.search?.reason, results.info.matches?.reason, results.info.players?.reason, results.info.series?.reason]
                   .filter(Boolean)
                   .filter((reason: string, index: number, list: string[]) => list.indexOf(reason) === index)
                   .join(' | ') || 'No provider reason was supplied.'}
@@ -665,50 +690,77 @@ const SearchResultsContent = () => {
           </div>
         </div>
       )}
-      <ResultSection
-        title="Players"
-        subtitle="Profiles and player records matching this search"
-        icon={<User size={20} className="text-blue-600" />}
-      >
-        {results?.players?.length > 0 ? (
-          <div className="cz-grid grid grid-cols-1 md:grid-cols-2 gap-4">
-            {results.players.map((player: any) => (
-              <Link
-                href={`/player?id=${encodeURIComponent(player.id)}`}
-                key={player.id || player.name}
-                className="cz-card group flex items-center gap-4 rounded-lg border border-gray-100 bg-gray-50 p-5 transition-all hover:border-blue-200 hover:bg-blue-50 dark:border-gray-800 dark:bg-gray-950/40 dark:hover:border-blue-900 dark:hover:bg-blue-900/10"
-              >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
-                  <User size={22} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-lg font-black text-gray-900 group-hover:text-blue-700 dark:text-white">
-                    {player.name}
-                  </h3>
-                  <p className="mt-1 text-xs font-bold uppercase tracking-wider text-gray-500">
-                    {player.role || player.country || 'Player profile'}
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-blue-600">
-                    Open complete profile
-                  </p>
-                </div>
-                <ChevronRight size={16} className="shrink-0 text-gray-400 transition-transform group-hover:translate-x-1 group-hover:text-blue-600" />
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <EmptyState text={`No players found matching "${query}".`} />
-        )}
-      </ResultSection>
+      {!isTournamentSearch && (
+        <ResultSection
+          title="Players"
+          subtitle="Profiles and player records matching this search"
+          icon={<User size={20} className="text-blue-600" />}
+        >
+          {results?.players?.length > 0 ? (
+            <div className="cz-grid grid grid-cols-1 md:grid-cols-2 gap-4">
+              {results.players.map((player: any) => (
+                <Link
+                  href={`/player?id=${encodeURIComponent(player.id)}`}
+                  key={player.id || player.name}
+                  className="cz-card group flex items-center gap-4 rounded-lg border border-gray-100 bg-gray-50 p-5 transition-all hover:border-blue-200 hover:bg-blue-50 dark:border-gray-800 dark:bg-gray-950/40 dark:hover:border-blue-900 dark:hover:bg-blue-900/10"
+                >
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
+                    <User size={22} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-lg font-black text-gray-900 group-hover:text-blue-700 dark:text-white">
+                      {player.name}
+                    </h3>
+                    <p className="mt-1 text-xs font-bold uppercase tracking-wider text-gray-500">
+                      {player.role || player.country || 'Player profile'}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-blue-600">
+                      Open complete profile
+                    </p>
+                  </div>
+                  <ChevronRight size={16} className="shrink-0 text-gray-400 transition-transform group-hover:translate-x-1 group-hover:text-blue-600" />
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <EmptyState text={`No players found matching "${query}".`} />
+          )}
+        </ResultSection>
+      )}
 
       <ResultSection
         title="Series & Tournaments"
         subtitle="Competitions, seasons, and archive categories"
         icon={<Database size={20} className="text-orange-600" />}
       >
-        {results?.series?.length > 0 ? (
+        {results?.series?.length > 0 || selectedSeasonSummary ? (
           <div className="cz-grid grid grid-cols-1 md:grid-cols-2 gap-4">
-            {results.series.map((series: any) => (
+            {selectedSeasonSummary && (
+              <div className="cz-card rounded-lg border border-orange-100 bg-orange-50 p-5 dark:border-orange-900/40 dark:bg-orange-950/20">
+                <div className="cz-card-top mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <span className="cz-card-title block text-base font-black text-gray-900 dark:text-white">
+                      {selectedTournament.label} {year}
+                    </span>
+                    <span className="mt-1 block text-xs font-bold uppercase tracking-wider text-gray-500">
+                      Season archive summary
+                    </span>
+                  </div>
+                  <Trophy size={18} className="shrink-0 text-orange-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-white p-3 ring-1 ring-orange-100 dark:bg-gray-900 dark:ring-orange-900/40">
+                    <p className="text-lg font-black text-green-600">{selectedSeasonSummary.totalMatches}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Matches</p>
+                  </div>
+                  <div className="rounded-lg bg-white p-3 ring-1 ring-orange-100 dark:bg-gray-900 dark:ring-orange-900/40">
+                    <p className="text-sm font-black text-orange-600">{selectedSeasonSummary.winner}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Winner</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {(results?.series || []).map((series: any) => (
               <div key={series.id || series.name} className="cz-card rounded-lg border border-gray-100 bg-gray-50 p-5 dark:border-gray-800 dark:bg-gray-950/40">
                 <div className="cz-card-top mb-4 flex items-start justify-between gap-3">
                   <div>

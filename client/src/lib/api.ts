@@ -8,6 +8,7 @@ declare global {
 }
 
 const trimSlash = (value: string) => value.replace(/\/+$/, '');
+const REQUEST_TIMEOUT_MS = 60000;
 
 const isLocalHost = (hostname: string) =>
   hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
@@ -41,6 +42,8 @@ const extractData = (payload: any) => {
 
 const request = async (path: string, params?: Record<string, string | number | undefined>) => {
   const url = new URL(`${getApiBaseUrl()}${path}`);
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   Object.entries(params || {}).forEach(([key, value]) => {
     if (value !== undefined && value !== '') {
@@ -48,9 +51,20 @@ const request = async (path: string, params?: Record<string, string | number | u
     }
   });
 
-  const response = await fetch(url.toString(), {
-    cache: 'no-store',
-  });
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('The cricket data request timed out. Please try again.');
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
 
   const payload = await response.json().catch(() => null);
 
