@@ -104,21 +104,21 @@ const MatchDetails = ({ id }: { id?: string }) => {
               </div>
             </div>
             
-            <div className="bg-[#0f172a] p-8 rounded-3xl border border-blue-800/50 shadow-2xl w-full md:w-auto min-w-[350px] relative overflow-hidden group">
+            <div className="bg-[#0f172a] p-6 md:p-8 rounded-3xl border border-blue-800/50 shadow-2xl w-full md:w-auto md:min-w-[350px] md:max-w-[620px] relative overflow-hidden group">
               <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                 <Trophy size={100} />
               </div>
               <div className="relative z-10">
                 <div className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-blue-900/50 rounded-xl flex items-center justify-center font-black text-blue-300 border border-blue-700/50">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex min-w-0 flex-1 items-center gap-3 md:gap-4">
+                      <div className="w-10 h-10 shrink-0 bg-blue-900/50 rounded-xl flex items-center justify-center font-black text-blue-300 border border-blue-700/50">
                         {teamShort(match, 0)}
                       </div>
-                      <span className="font-black text-lg">{teamName(match, 0)}</span>
+                      <span className="min-w-0 truncate font-black text-base md:text-lg">{teamName(match, 0)}</span>
                     </div>
-                    <div className="text-right">
-                      <span className="text-2xl font-black tracking-tighter">
+                    <div className="shrink-0 text-right">
+                      <span className="text-xl md:text-2xl font-black tracking-tighter">
                         {scoreForTeam(match, 0)}
                       </span>
                       <span className="text-[10px] block text-blue-400 font-bold uppercase tracking-tighter">
@@ -126,15 +126,15 @@ const MatchDetails = ({ id }: { id?: string }) => {
                       </span>
                     </div>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-yellow-900/20 rounded-xl flex items-center justify-center font-black text-yellow-300 border border-yellow-700/50">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex min-w-0 flex-1 items-center gap-3 md:gap-4">
+                      <div className="w-10 h-10 shrink-0 bg-yellow-900/20 rounded-xl flex items-center justify-center font-black text-yellow-300 border border-yellow-700/50">
                         {teamShort(match, 1)}
                       </div>
-                      <span className="font-black text-lg">{teamName(match, 1)}</span>
+                      <span className="min-w-0 truncate font-black text-base md:text-lg">{teamName(match, 1)}</span>
                     </div>
-                    <div className="text-right">
-                      <span className="text-2xl font-black tracking-tighter">
+                    <div className="shrink-0 text-right">
+                      <span className="text-xl md:text-2xl font-black tracking-tighter">
                         {scoreForTeam(match, 1)}
                       </span>
                       <span className="text-[10px] block text-blue-400 font-bold uppercase tracking-tighter">
@@ -276,8 +276,37 @@ const MatchDetails = ({ id }: { id?: string }) => {
                     </div>
                   ))
                 ) : (
-                  <div className="bg-white dark:bg-gray-900 rounded-3xl p-20 text-center border border-gray-100 dark:border-gray-800 shadow-xl">
-                    <p className="text-gray-500 font-bold italic">Scorecard will be available shortly after the match begins.</p>
+                  <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 md:p-12 border border-gray-100 dark:border-gray-800 shadow-xl">
+                    {match.matchStarted === false || /not started|scheduled|fixture|upcoming/i.test(match.status || '') ? (
+                      <div>
+                        <div className="mb-6 flex items-center gap-3">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-orange-600 dark:bg-orange-950/30">
+                            <Calendar size={22} />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white">Fixture Preview</h3>
+                            <p className="text-sm font-bold text-gray-500">Scorecard will appear when the match begins.</p>
+                          </div>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {[
+                            { label: 'Team 1', value: teamName(match, 0) },
+                            { label: 'Team 2', value: teamName(match, 1) },
+                            { label: 'Venue', value: match.venue || 'Venue unavailable' },
+                            { label: 'Start Time', value: matchTime },
+                            { label: 'Series', value: match.series || 'Series unavailable' },
+                            { label: 'Status', value: match.status || 'Match not started' },
+                          ].map((item) => (
+                            <div key={item.label} className="rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100 dark:bg-gray-800/50 dark:ring-gray-700">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{item.label}</p>
+                              <p className="mt-1 font-bold text-gray-900 dark:text-white">{item.value}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-center text-gray-500 font-bold italic">Scorecard is unavailable from the current API response.</p>
+                    )}
                   </div>
                 )}
               </div>
